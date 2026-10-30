@@ -1,0 +1,39 @@
+version: 1
+board: t3code-with-plugins
+writing_guidance:
+  proposed_solution: State the expected deliverable and approach, scope, exclusions, and assumptions. For runtime changes, identify the installed environment and classify delivery as AppImage, plugin-only, or both; record the ordered test, main integration, build, installation, restart, and runtime verification steps. Documentation and investigation-only tickets do not require a runtime deployment.
+acceptance:
+  always: []
+  conditional:
+    - id: architecture-explanation
+      when: The ticket models or compares plugin architectures.
+      criterion: Explain boundaries, dependency directions, trade-offs, upstream update impact, and unresolved assumptions with diagrams displayed in the T3 Code conversation.
+      evidence: Linked HTML diagrams shown using html_preview then html_render, accompanying explanation, and recorded decisions or open questions.
+    - id: runtime-verification
+      when: The ticket changes runtime behavior or fixes a logic, data, state, or protocol bug.
+      criterion: Verify the changed behavior at the lowest meaningful layer, including a failing regression first for nonvisual bug fixes.
+      evidence: Focused test results and a short runtime transcript for server-only fixes, following AGENTS.md.
+    - id: frontend-verification
+      when: The ticket changes user-visible frontend behavior.
+      criterion: Complete one integrated real-client pass and record which entry points, clients, providers, contracts, reverse states, and connection modes apply.
+      evidence: test-t3-app or test-t3-mobile results, applicable surface decisions, and before/after captures for visual fixes.
+    - id: pre-push-checks
+      when: The ticket includes an authorized push of changes to the T3 Code repository.
+      criterion: Run vp run check:changed before pushing and resolve relevant failures without running prohibited repository-wide checks.
+      evidence: Command result associated with the delivered change.
+    - id: post-merge-delivery-gate
+      when: The ticket changes executable application or plugin code, dependencies, or build inputs.
+      criterion: Pass all applicable tests and required checks, resolve failures, and merge the complete change into main before building or installing the delivery artifact. Development builds for testing may precede integration. Build the delivery artifact from the verified main revision without unrelated uncommitted changes.
+      evidence: Passing test and check results, full delivery commit hashes verified as ancestors of main, the main revision used for the build, and the selected deployment route with its reason. Follow AGENTS.md for scoped checks; do not invent repository-wide test requirements.
+    - id: installed-appimage-delivery
+      when: The ticket changes the T3 host, renderer, server, desktop shell, shared plugin API, or dependencies/build inputs bundled into the desktop app, including changes that also modify plugins.
+      criterion: After the delivery gate passes, build the Linux AppImage with vp run dist:desktop:linux, verify it in an isolated desktop instance, install it in the user's fork release location, update the persistent fork launcher, restart safely, and verify the installed runtime and changed behavior. Preserve user data and the previous release for rollback; do not interrupt active turns to force a restart.
+      evidence: Build log, source main SHA, artifact path and SHA-256, isolated desktop verification, launcher target, and observed installed runtime after restart. If active work prevents restart, record installation as pending activation and keep the ticket in-progress until activation is verified.
+    - id: installed-plugin-delivery
+      when: The ticket changes a separately installed plugin, whether alone or alongside host changes.
+      criterion: After the delivery gate passes, compile the affected plugin from the verified main revision and reinstall it through the environment's supported plugin installation operation. For plugin-only changes compatible with the installed host API, do not rebuild the AppImage; for host/API changes, also complete AppImage delivery. Restart the environment safely and verify the active plugin and changed behavior, preserving configuration and bindings.
+      evidence: Plugin build result, source main SHA, manifest version and bundle SHA-256, installation result, and active package verification after restart. A staged update alone is not completion; keep the ticket in-progress while activation is pending.
+sources:
+  - "AGENTS.md: Hit every surface, Verifying, Documentation, and Plans and work artifacts."
+  - "Board initialization request on 2026-10-29: minimal upstream coupling, plug-and-play plugins, architecture learning, and HTML diagrams."
+  - "User instruction on 2026-10-30: applicable tests must pass and changes must be merged into main before building and installing the AppImage or affected plugin; apply the missing delivery to T3P-007 and T3P-008."
