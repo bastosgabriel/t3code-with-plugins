@@ -5,6 +5,7 @@ import { useAtomValue } from "@effect/atom-react";
 import {
   PluginDocument,
   PluginPickerPage,
+  PluginThreadItemState,
   type PluginAction,
   type PluginCatalog,
   type PluginCallInput,
@@ -13,7 +14,7 @@ import {
 import { squashAtomCommandFailure } from "@t3tools/client-runtime/state/runtime";
 import * as Schema from "effect/Schema";
 import * as Option from "effect/Option";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { PuzzleIcon } from "lucide-react";
 import { pluginEnvironment } from "../../state/plugins";
 import { useEnvironmentQuery } from "../../state/query";
@@ -28,7 +29,7 @@ import ChatMarkdown from "../ChatMarkdown";
 type Plugin = PluginCatalog["plugins"][number];
 const decodeDocument = Schema.decodeUnknownOption(PluginDocument);
 const decodePicker = Schema.decodeUnknownOption(PluginPickerPage);
-const decodeLabel = Schema.decodeUnknownOption(Schema.Struct({ label: Schema.String }));
+const decodeLabel = Schema.decodeUnknownOption(PluginThreadItemState);
 const record = (value: Schema.Json): { readonly [key: string]: Schema.Json } =>
   value !== null && typeof value === "object" && !Array.isArray(value)
     ? (value as { readonly [key: string]: Schema.Json })
@@ -63,7 +64,32 @@ const call = (
 
 export function usePluginSurfaceActions(threadRef: ScopedThreadRef | null) {
   const catalog = usePluginCatalog(threadRef);
-  if (!threadRef) return [];
+  const [selection, setSelection] = useState<{
+    threadRef: ScopedThreadRef;
+    plugin: Plugin;
+    item: Plugin["contributions"]["threadItems"][number];
+  } | null>(null);
+  const sameThread =
+    selection?.threadRef.environmentId === threadRef?.environmentId &&
+    selection?.threadRef.threadId === threadRef?.threadId;
+  if (selection && !sameThread) setSelection(null);
+  const activePlugin = catalog.data?.plugins.find(
+    (plugin) =>
+      plugin.pluginId === selection?.plugin.pluginId &&
+      plugin.generation === selection.plugin.generation,
+  );
+  const dialog =
+    selection && sameThread ? (
+      <PluginSurfaceSelection
+        key={`${selection.threadRef.environmentId}:${selection.threadRef.threadId}:${selection.plugin.generation}:${selection.item.id}`}
+        threadRef={selection.threadRef}
+        plugin={activePlugin ?? null}
+        item={selection.item}
+        unavailable={catalog.error !== null || !activePlugin}
+        onClose={() => setSelection(null)}
+      />
+    ) : null;
+  if (!threadRef) return { actions: [], dialog: null };
   const actions =
     catalog.data?.plugins.flatMap((plugin) =>
       plugin.contributions.threadItems.map((item) => ({
@@ -74,27 +100,122 @@ export function usePluginSurfaceActions(threadRef: ScopedThreadRef | null) {
           !catalog.error &&
           plugin.contributions.documentPanels.some((panel) => panel.id === item.panelId),
         disabledReason: "This plugin panel is unavailable. Check Plugins in Settings.",
-        onClick: () =>
+        onClick: () => setSelection({ threadRef, plugin, item }),
+      })),
+    ) ?? [];
+  return {
+    dialog,
+    actions:
+      actions.length > 0
+        ? actions
+        : [
+            {
+              label: catalog.isPending ? "Loading plugins…" : "Plugins unavailable",
+              icon: PuzzleIcon,
+              shortcut: "",
+              available: false,
+              disabledReason:
+                catalog.error ?? "Check Plugins in Settings and your environment permissions.",
+              onClick: () => {},
+            },
+          ],
+  };
+}
+
+function PluginSurfaceSelection({
+  threadRef,
+  plugin,
+  item,
+  unavailable,
+  onClose,
+}: {
+  threadRef: ScopedThreadRef;
+  plugin: Plugin | null;
+  item: Plugin["contributions"]["threadItems"][number];
+  unavailable: boolean;
+  onClose: () => void;
+}) {
+  const [resolved, setResolved] = useState<PluginThreadItemState | null>(null);
+  const query = useEnvironmentQuery(
+    plugin && !unavailable && !resolved
+      ? pluginEnvironment.query({
+          environmentId: threadRef.environmentId,
+          input: call(threadRef, plugin, item.queryId),
+        })
+      : null,
+  );
+  const state = unavailable
+    ? null
+    : (resolved ??
+      (!query.isPending && !query.error && query.data?.ok
+        ? Option.getOrNull(decodeLabel(query.data.value))
+        : null));
+  if (state && !resolved) setResolved(state);
+  const action =
+    state?.action ??
+    (state ? { kind: "panel" as const, panelId: item.panelId, label: item.label } : null);
+  const panel =
+    action?.kind === "panel" &&
+    plugin?.contributions.documentPanels.some((candidate) => candidate.id === action.panelId)
+      ? action
+      : null;
+  // oxlint-disable-next-line t3code/no-unreasoned-state-sync -- resolves the requested plugin navigation into the external right-panel store
+  useEffect(() => {
+    if (!panel || !plugin) return;
+    useRightPanelStore.getState().openPlugin(threadRef, {
+      pluginId: plugin.pluginId,
+      panelId: panel.panelId,
+      title: item.label,
+    });
+    onClose();
+  }, [panel, plugin, threadRef, item.label, onClose]);
+  if (panel) return null;
+  if (action?.kind === "picker" && plugin)
+    return (
+      <PluginActionControl
+        threadRef={threadRef}
+        plugin={plugin}
+        action={action}
+        input={action.input}
+        initialOpen
+        onClose={onClose}
+        onError={() => {}}
+        onComplete={() => {
           useRightPanelStore.getState().openPlugin(threadRef, {
             pluginId: plugin.pluginId,
             panelId: item.panelId,
             title: item.label,
-          }),
-      })),
-    ) ?? [];
-  return actions.length > 0
-    ? actions
-    : [
-        {
-          label: catalog.isPending ? "Loading plugins…" : "Plugins unavailable",
-          icon: PuzzleIcon,
-          shortcut: "",
-          available: false,
-          disabledReason:
-            catalog.error ?? "Check Plugins in Settings and your environment permissions.",
-          onClick: () => {},
-        },
-      ];
+          });
+          onClose();
+        }}
+      />
+    );
+  return (
+    <Dialog
+      open
+      onOpenChange={(open) => {
+        if (!open) onClose();
+      }}
+    >
+      <DialogPopup>
+        <DialogHeader>
+          <DialogTitle>{item.label}</DialogTitle>
+        </DialogHeader>
+        <DialogPanel>
+          <p role="status">
+            {unavailable
+              ? "This plugin is unavailable."
+              : (query.error ??
+                (query.data?.ok === false
+                  ? query.data.error.message
+                  : query.isPending
+                    ? "Loading…"
+                    : "The plugin returned an invalid navigation action."))}
+          </p>
+        </DialogPanel>
+      </DialogPopup>
+    </Dialog>
+  );
 }
 
 export function PluginThreadItems({ threadRef }: { threadRef: ScopedThreadRef }) {
@@ -302,6 +423,8 @@ function PluginActionControl({
   input,
   onComplete,
   onError,
+  initialOpen = false,
+  onClose,
 }: {
   threadRef: ScopedThreadRef;
   plugin: Plugin;
@@ -309,6 +432,8 @@ function PluginActionControl({
   input: Schema.Json;
   onComplete: () => void;
   onError: (message: string | null) => void;
+  initialOpen?: boolean;
+  onClose?: () => void;
 }) {
   const canOperate = useAtomValue(
     pluginEnvironment.command.permissionAtom(threadRef.environmentId),
@@ -316,14 +441,22 @@ function PluginActionControl({
   const command = useAtomCommand(pluginEnvironment.command);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [open, setOpen] = useState(false);
+  const [open, setOpen] = useState(initialOpen);
+  const active = useRef(true);
+  // oxlint-disable-next-line t3code/no-unreasoned-state-sync -- ignores asynchronous command completion after the initiating thread or plugin view unmounts
+  useEffect(() => {
+    active.current = true;
+    return () => {
+      active.current = false;
+    };
+  }, []);
   const available =
     action.kind === "panel" ||
     plugin.contributions.operations.some(
       (operation) => operation.id === action.commandId && operation.kind === "command",
     );
   const execute = async (value: Schema.Json) => {
-    if (action.kind === "panel" || busy) return;
+    if (action.kind === "panel" || busy || !available || !canOperate) return;
     setBusy(true);
     onError(null);
     setError(null);
@@ -331,6 +464,7 @@ function PluginActionControl({
       environmentId: threadRef.environmentId,
       input: { ...call(threadRef, plugin, action.commandId, value), operationId: randomUUID() },
     });
+    if (!active.current) return;
     setBusy(false);
     const failure =
       result._tag === "Failure"
@@ -348,30 +482,45 @@ function PluginActionControl({
   };
   return (
     <div>
-      <Button
-        variant="outline"
-        size="sm"
-        disabled={busy || !available || (action.kind !== "panel" && !canOperate)}
-        onClick={() => {
-          if (action.kind === "panel")
-            useRightPanelStore.getState().openPlugin(threadRef, {
-              pluginId: plugin.pluginId,
-              panelId: action.panelId,
-              title: action.label,
-            });
-          else if (action.kind === "picker") setOpen(true);
-          else void execute(input);
-        }}
-      >
-        {action.label}
-      </Button>
+      {!initialOpen && (
+        <Button
+          variant="outline"
+          size="sm"
+          disabled={busy || !available || (action.kind !== "panel" && !canOperate)}
+          onClick={() => {
+            if (action.kind === "panel")
+              useRightPanelStore.getState().openPlugin(threadRef, {
+                pluginId: plugin.pluginId,
+                panelId: action.panelId,
+                title: action.label,
+              });
+            else if (action.kind === "picker") setOpen(true);
+            else void execute(input);
+          }}
+        >
+          {action.label}
+        </Button>
+      )}
       {action.kind === "picker" && (
-        <Dialog open={open} onOpenChange={setOpen}>
+        <Dialog
+          open={open}
+          onOpenChange={(next) => {
+            setOpen(next);
+            if (!next) onClose?.();
+          }}
+        >
           <DialogPopup>
             <DialogHeader>
               <DialogTitle>{action.label}</DialogTitle>
             </DialogHeader>
             <DialogPanel>
+              {(!canOperate || !available) && (
+                <p role="status">
+                  {!canOperate
+                    ? "You do not have permission to perform this action in this environment."
+                    : "This plugin action is unavailable."}
+                </p>
+              )}
               {error && (
                 <p role="alert" className="mb-3 text-sm text-destructive">
                   {error}
@@ -382,7 +531,7 @@ function PluginActionControl({
                   threadRef={threadRef}
                   plugin={plugin}
                   action={action}
-                  busy={busy}
+                  busy={busy || !canOperate || !available}
                   onSelect={(key) => {
                     void execute({ ...record(action.input), key });
                   }}
@@ -420,7 +569,10 @@ function PluginPicker({
       }),
     }),
   );
-  const page = query.data?.ok ? Option.getOrNull(decodePicker(query.data.value)) : null;
+  const page =
+    !query.error && !query.isPending && query.data?.ok
+      ? Option.getOrNull(decodePicker(query.data.value))
+      : null;
   return (
     <div className="space-y-3">
       <Input

@@ -129,6 +129,11 @@ export interface ThreadItemContribution {
   readonly panelId: string;
 }
 
+export type PluginThreadItemState = {
+  label: string;
+  action?: PluginAction;
+};
+
 export interface DocumentPanelContribution {
   readonly id: string;
   readonly queryId: string;

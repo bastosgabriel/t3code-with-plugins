@@ -4,7 +4,14 @@ import * as NodeFS from "node:fs";
 import * as NodePath from "node:path";
 import * as NodeCrypto from "node:crypto";
 import * as NodeFSP from "node:fs/promises";
-import type { Json, JsonSchema, PluginApi, PluginResult, ThreadContext } from "@t3tools/plugin-api";
+import type {
+  Json,
+  JsonSchema,
+  PluginApi,
+  PluginResult,
+  PluginThreadItemState,
+  ThreadContext,
+} from "@t3tools/plugin-api";
 
 type TicketKey = { vaultId: string; boardId: string; ticketId: string };
 type Binding = { revision: number; ticket: TicketKey | null };
@@ -31,6 +38,13 @@ const object = (
 ): JsonSchema => ({ type: "object", properties, required, additionalProperties: false });
 const string = { type: "string", maxLength: 4096 } as const;
 const revisionSchema = { type: "number", minimum: 0 } as const;
+const selectTicket = {
+  kind: "picker",
+  label: "Select ticket",
+  queryId: "ticket.search",
+  commandId: "binding.set",
+  input: {},
+} as const;
 const success = (value: Json): PluginResult => ({ ok: true, value });
 const failure = (code: string, message: string, recoveryId?: string): PluginResult => ({
   ok: false,
@@ -490,7 +504,12 @@ export async function activate(api: PluginApi): Promise<void> {
       }
       return success({
         ...selected,
-        label,
+        ...({
+          label,
+          action: selected.ticket
+            ? { kind: "panel", label: "Ticket", panelId: "ticket" }
+            : selectTicket,
+        } satisfies PluginThreadItemState),
         recoveries: recoveries(context).map(([key]) => JSON.parse(key)[2]),
       });
     },
@@ -824,13 +843,7 @@ export async function activate(api: PluginApi): Promise<void> {
     id: "ticket",
     queryId: "ticket.read",
     actions: [
-      {
-        kind: "picker",
-        label: "Select ticket",
-        queryId: "ticket.search",
-        commandId: "binding.set",
-        input: {},
-      },
+      selectTicket,
       { kind: "command", label: "Unlink", commandId: "binding.clear", input: {} },
       {
         kind: "picker",

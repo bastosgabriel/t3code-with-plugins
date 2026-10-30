@@ -297,7 +297,7 @@ function SurfaceMenuItem(props: {
 }
 
 function RightPanelEmptyState(props: {
-  pluginActions: ReturnType<typeof usePluginSurfaceActions>;
+  pluginActions: ReturnType<typeof usePluginSurfaceActions>["actions"];
   onAddBrowser: () => void;
   onAddBrowserInProfile: (profileId: string) => void;
   browserProfiles: ReadonlyArray<{ readonly id: string; readonly name: string }>;
@@ -950,7 +950,9 @@ function RightPanelTab(
 }
 
 export function RightPanelTabs(props: RightPanelTabsProps) {
-  const pluginActions = usePluginSurfaceActions(props.threadRef ?? null);
+  const { actions: pluginActions, dialog: pluginDialog } = usePluginSurfaceActions(
+    props.threadRef ?? null,
+  );
   const focusedSurface = props.surfaces.find((surface) => surface.id === props.activeSurfaceId);
   const ownsDesktopTitleBar = isElectron && props.mode === "inline";
   const browserProfiles = useBrowserDefaults().profiles;
@@ -1438,6 +1440,7 @@ export function RightPanelTabs(props: RightPanelTabsProps) {
           />
         ) : null}
       </div>
+      {pluginDialog}
       <div className="flex min-h-0 flex-1 flex-col" data-right-panel-surface-content>
         {props.activeSurfaceId === null ? (
           <RightPanelEmptyState

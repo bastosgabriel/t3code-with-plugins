@@ -125,6 +125,14 @@ async function fixture() {
 
 it("persists bindings, rejects stale revisions and replays operation receipts without rewriting tickets", async () => {
   await using f = await fixture();
+  const selection = {
+    kind: "picker",
+    label: "Select ticket",
+    queryId: "ticket.search",
+    commandId: "binding.set",
+    input: {},
+  };
+  expect(value(await f.query("binding.get")).action).toEqual(selection);
   const first = await f.bind("T-1", 0, "first");
   expect(value(first).revision).toBe(1);
   expect(await f.bind("T-1", 0, "first")).toEqual(first);
@@ -133,6 +141,11 @@ it("persists bindings, rejects stale revisions and replays operation receipts wi
   expect(error(await f.bind("T-2", 0, "stale"))).toBe("binding_conflict");
   await f.start();
   expect(value(await f.query("binding.get")).ticket).toEqual(ticket("T-1"));
+  expect(value(await f.query("binding.get")).action).toEqual({
+    kind: "panel",
+    label: "Ticket",
+    panelId: "ticket",
+  });
   expect(value(await f.bind("T-2", 1, "switch")).revision).toBe(2);
   const docs = await f.documents();
   expect(docs.docs["T-1"]!.references).toEqual([]);
@@ -141,6 +154,7 @@ it("persists bindings, rejects stale revisions and replays operation receipts wi
     value(await f.command("binding.clear", "clear", { expectedBindingRevision: 2 })).ticket,
   ).toBeNull();
   expect((await f.documents()).docs["T-2"]!.references).toEqual([]);
+  expect(value(await f.query("binding.get")).action).toEqual(selection);
 });
 
 it("recovers an interrupted repair using the complete original ticket set after restarting", async () => {
