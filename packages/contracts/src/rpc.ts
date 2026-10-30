@@ -1,4 +1,14 @@
 import {
+  PluginAdminInput,
+  PluginCallInput,
+  PluginCommandInput,
+  PluginTarget,
+  PluginInstalled,
+  PluginCatalog,
+  PluginResult,
+  PluginError,
+} from "./plugins.ts";
+import {
   OrchestrationV2SearchThreadError,
   OrchestrationV2SearchThreadInput,
   OrchestrationV2SearchThreadResult,
@@ -398,6 +408,13 @@ import { VcsError } from "./vcs.ts";
 import { Project, ProjectMutation, ProjectMutationError } from "./project.ts";
 
 export const WS_METHODS = {
+  pluginsList: "plugins.list",
+  pluginsManage: "plugins.manage",
+  pluginsCatalog: "plugins.catalog",
+  pluginsQuery: "plugins.query",
+  pluginsCommand: "plugins.command",
+  pluginsObserve: "plugins.observe",
+  pluginsCatalogObserve: "plugins.catalogObserve",
   projectsListEntries: "projects.listEntries",
   projectsListIgnoredFiles: "projects.listIgnoredFiles",
   projectsReadFile: "projects.readFile",
@@ -1933,6 +1950,43 @@ export class RpcScopeAuthorization extends RpcMiddleware.Service<RpcScopeAuthori
 ) {}
 
 export const WsRpcGroup = RpcGroup.make(
+  Rpc.make(WS_METHODS.pluginsList, {
+    payload: Schema.Struct({}),
+    success: Schema.Array(PluginInstalled),
+    error: Schema.Union([PluginError, EnvironmentAuthorizationError]),
+  }),
+  Rpc.make(WS_METHODS.pluginsManage, {
+    payload: PluginAdminInput,
+    success: Schema.Void,
+    error: Schema.Union([PluginError, EnvironmentAuthorizationError]),
+  }),
+  Rpc.make(WS_METHODS.pluginsCatalog, {
+    payload: PluginTarget,
+    success: PluginCatalog,
+    error: Schema.Union([PluginError, EnvironmentAuthorizationError]),
+  }),
+  Rpc.make(WS_METHODS.pluginsQuery, {
+    payload: PluginCallInput,
+    success: PluginResult,
+    error: Schema.Union([PluginError, EnvironmentAuthorizationError]),
+  }),
+  Rpc.make(WS_METHODS.pluginsCommand, {
+    payload: PluginCommandInput,
+    success: PluginResult,
+    error: Schema.Union([PluginError, EnvironmentAuthorizationError]),
+  }),
+  Rpc.make(WS_METHODS.pluginsCatalogObserve, {
+    payload: PluginTarget,
+    success: Schema.Number,
+    stream: true,
+    error: Schema.Union([PluginError, EnvironmentAuthorizationError]),
+  }),
+  Rpc.make(WS_METHODS.pluginsObserve, {
+    payload: PluginCallInput,
+    success: Schema.Number,
+    stream: true,
+    error: Schema.Union([PluginError, EnvironmentAuthorizationError]),
+  }),
   WsGuestShareCreateRpc,
   WsServerProbeRpc,
   WsServerGetConfigRpc,

@@ -140,6 +140,12 @@
       // These workspace packages are private to this monorepo.
       "includeEntryExports": true,
     },
+    "packages/plugin-api": {
+      "entry": ["src/index.ts!", "examples/*.ts"],
+    },
+    "plugins/*": {
+      "entry": ["src/index.ts!"],
+    },
     "packages/effect-acp": {
       "includeEntryExports": true,
       "entry": ["test/fixtures/*.ts"],

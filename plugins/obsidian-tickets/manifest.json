@@ -1,0 +1,8 @@
+{
+  "id": "obsidian-tickets",
+  "name": "Obsidian tickets",
+  "version": "1.0.0",
+  "apiVersion": 1,
+  "uiVersion": 1,
+  "entry": "index.mjs"
+}

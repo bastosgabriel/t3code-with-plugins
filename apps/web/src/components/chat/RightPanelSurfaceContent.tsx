@@ -1,3 +1,4 @@
+import { PluginDocumentPanel } from "../plugins/PluginViews";
 import type {
   EditorId,
   EnvironmentId,
@@ -79,6 +80,14 @@ export function RightPanelSurfaceContent(props: {
   const { surface, threadRef, visible } = props;
   if (surface === null) return null;
   switch (surface.kind) {
+    case "plugin":
+      return visible ? (
+        <PluginDocumentPanel
+          threadRef={threadRef}
+          pluginId={surface.pluginId}
+          panelId={surface.panelId}
+        />
+      ) : null;
     case "preview":
       return (
         <Suspense fallback={null}>

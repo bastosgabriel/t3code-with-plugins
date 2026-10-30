@@ -182,6 +182,32 @@ export default defineConfig({
     sortPackageJson: {},
     overrides: [
       {
+        files: ["packages/plugin-api/src/**", "packages/plugin-api/examples/**", "plugins/**"],
+        rules: {
+          "eslint/no-restricted-imports": [
+            "error",
+            {
+              patterns: [
+                {
+                  group: [
+                    "@t3tools/*",
+                    "!@t3tools/plugin-api",
+                    "effect",
+                    "effect/**",
+                    "react",
+                    "react/**",
+                    "**/apps/**",
+                    "**/packages/**",
+                  ],
+                  message:
+                    "Plugins and their public contract must not depend on private T3, Effect or React APIs.",
+                },
+              ],
+            },
+          ],
+        },
+      },
+      {
         files: [".devcontainer/devcontainer.json"],
         options: {
           trailingComma: "none",

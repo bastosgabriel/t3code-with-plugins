@@ -1,3 +1,4 @@
+import { PluginThreadItems } from "../plugins/PluginViews";
 import type {
   EditorId,
   EnvironmentId,
@@ -252,6 +253,7 @@ export function ThreadDetailsPanel(props: ThreadDetailsPanelProps) {
                 />
               ) : null}
 
+              {props.isServerThread && <PluginThreadItems threadRef={activeThreadRef} />}
               {visible.usage ? <ThreadDetailsUsage {...props.usage} /> : null}
 
               {/* Shown only when no section above has content, so an emptied card can be refilled. */}

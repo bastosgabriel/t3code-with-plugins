@@ -1,3 +1,4 @@
+import * as PluginHost from "./plugins/PluginHost.ts";
 import { OrchestrationDispatchCommandError } from "@t3tools/contracts";
 import * as Context from "effect/Context";
 import * as Crypto from "effect/Crypto";
@@ -1226,6 +1227,8 @@ export const layerWsRpc = (
     Effect.gen(function* () {
       const currentSessionId = currentSession.sessionId;
       const sql = yield* SqlClient.SqlClient;
+      const plugins = yield* PluginHost.PluginHost;
+      const pluginPrincipal = { scopes: currentSession.scopes, agent: false };
       const threadManagement = yield* ThreadManagementService.ThreadManagementService;
       const intakeContext = yield* Effect.context<
         | ThreadManagementService.ThreadManagementService
@@ -1861,6 +1864,14 @@ export const layerWsRpc = (
       });
 
       const handlers = ServerWsRpcGroup.of({
+        [WS_METHODS.pluginsList]: () => plugins.list(pluginPrincipal),
+        [WS_METHODS.pluginsManage]: (input) => plugins.manage(input, pluginPrincipal),
+        [WS_METHODS.pluginsCatalog]: (input) => plugins.catalog(input, pluginPrincipal),
+        [WS_METHODS.pluginsQuery]: (input) => plugins.query(input, pluginPrincipal),
+        [WS_METHODS.pluginsCommand]: (input) => plugins.command(input, pluginPrincipal),
+        [WS_METHODS.pluginsObserve]: (input) => plugins.observe(input, pluginPrincipal),
+        [WS_METHODS.pluginsCatalogObserve]: (input) =>
+          plugins.observeCatalog(input, pluginPrincipal),
         [ORCHESTRATION_V2_WS_METHODS.dispatchCommand]: (command) =>
           Effect.annotateCurrentSpan({
             "orchestration_v2.command_id": command.commandId,

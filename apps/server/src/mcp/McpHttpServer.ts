@@ -1,3 +1,5 @@
+import { PluginToolkit } from "./toolkits/plugins/tools.ts";
+import * as PluginHandlers from "./toolkits/plugins/handlers.ts";
 import * as Cause from "effect/Cause";
 import * as Clock from "effect/Clock";
 import * as Context from "effect/Context";
@@ -1152,6 +1154,9 @@ export const layerTools = Layer.mergeAll(
   layerAttachmentToolkit,
   layerProjectRegistration,
   layerEnvironmentToolkit,
+  toolkitRegistration(PluginToolkit, PluginHandlers.layer).pipe(
+    Layer.provide(ThreadCommandExecutor.layer),
+  ),
   layerPreviewControlsRegistration,
   layerWorktreeToolkitRegistration,
   layerPullRequestsToolkit,
