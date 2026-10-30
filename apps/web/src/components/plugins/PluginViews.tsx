@@ -14,7 +14,7 @@ import { squashAtomCommandFailure } from "@t3tools/client-runtime/state/runtime"
 import * as Schema from "effect/Schema";
 import * as Option from "effect/Option";
 import { useState } from "react";
-import { PuzzleIcon } from "lucide-react";
+import { ChevronDownIcon, PuzzleIcon } from "lucide-react";
 import { pluginEnvironment } from "../../state/plugins";
 import { useEnvironmentQuery } from "../../state/query";
 import { useAtomCommand } from "../../state/use-atom-command";
@@ -144,14 +144,15 @@ function PluginThreadItem({
   const [open, setOpen] = useState(false);
   return (
     <>
-      <ThreadDetailsControl part="select" multiline onClick={() => setOpen(true)}>
+      <ThreadDetailsControl multiline onClick={() => setOpen(true)}>
         <PuzzleIcon className="size-4 shrink-0" />
-        <span className="min-w-0 text-left">
+        <span className="min-w-0 flex-1 text-left">
           <span className="block">{item.label}</span>
           <span className="block truncate text-xs text-muted-foreground">
             {label ?? (query.isPending ? "Loading…" : "Unavailable")}
           </span>
         </span>
+        <ChevronDownIcon className="size-4 shrink-0 text-muted-foreground" />
       </ThreadDetailsControl>
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogPopup>
