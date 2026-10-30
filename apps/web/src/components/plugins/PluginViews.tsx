@@ -33,11 +33,13 @@ const record = (value: Schema.Json): { readonly [key: string]: Schema.Json } =>
   value !== null && typeof value === "object" && !Array.isArray(value)
     ? (value as { readonly [key: string]: Schema.Json })
     : {};
-function usePluginCatalog(threadRef: ScopedThreadRef) {
+function usePluginCatalog(threadRef: ScopedThreadRef | null) {
+  const configs = useServerConfigs();
   const supported =
-    useServerConfigs().get(threadRef.environmentId)?.environment.capabilities?.pluginApiV1 === true;
+    threadRef &&
+    configs.get(threadRef.environmentId)?.environment.capabilities?.pluginApiV1 === true;
   return useEnvironmentQuery(
-    supported
+    supported && threadRef
       ? pluginEnvironment.catalog({
           environmentId: threadRef.environmentId,
           input: { ...threadRef, uiVersion: 1 },
@@ -59,6 +61,42 @@ const call = (
   input,
 });
 
+export function usePluginSurfaceActions(threadRef: ScopedThreadRef | null) {
+  const catalog = usePluginCatalog(threadRef);
+  if (!threadRef) return [];
+  const actions =
+    catalog.data?.plugins.flatMap((plugin) =>
+      plugin.contributions.threadItems.map((item) => ({
+        label: item.label,
+        icon: PuzzleIcon,
+        shortcut: "",
+        available:
+          !catalog.error &&
+          plugin.contributions.documentPanels.some((panel) => panel.id === item.panelId),
+        disabledReason: "This plugin panel is unavailable. Check Plugins in Settings.",
+        onClick: () =>
+          useRightPanelStore.getState().openPlugin(threadRef, {
+            pluginId: plugin.pluginId,
+            panelId: item.panelId,
+            title: item.label,
+          }),
+      })),
+    ) ?? [];
+  return actions.length > 0
+    ? actions
+    : [
+        {
+          label: catalog.isPending ? "Loading plugins…" : "Plugins unavailable",
+          icon: PuzzleIcon,
+          shortcut: "",
+          available: false,
+          disabledReason:
+            catalog.error ?? "Check Plugins in Settings and your environment permissions.",
+          onClick: () => {},
+        },
+      ];
+}
+
 export function PluginThreadItems({ threadRef }: { threadRef: ScopedThreadRef }) {
   const catalog = usePluginCatalog(threadRef);
   return (
@@ -67,12 +105,20 @@ export function PluginThreadItems({ threadRef }: { threadRef: ScopedThreadRef })
         {catalog.data?.plugins.flatMap((plugin) =>
           plugin.contributions.threadItems.map((item) => (
             <PluginThreadItem
-              key={`${plugin.pluginId}:${plugin.generation}:${item.id}`}
+              key={`${threadRef.environmentId}:${threadRef.threadId}:${plugin.pluginId}:${plugin.generation}:${item.id}`}
               threadRef={threadRef}
               plugin={plugin}
               item={item}
             />
           )),
+        )}
+        {(catalog.error ||
+          !catalog.data?.plugins.some((plugin) => plugin.contributions.threadItems.length > 0)) && (
+          <p role="status" className="px-2.5 text-xs text-muted-foreground">
+            {catalog.isPending
+              ? "Loading plugins…"
+              : "Plugins unavailable. Check Plugins in Settings and your environment permissions."}
+          </p>
         )}
       </div>
     </ThreadDetailsSection>
@@ -93,22 +139,51 @@ function PluginThreadItem({
       input: call(threadRef, plugin, item.queryId),
     }),
   );
-  const label = query.data?.ok ? Option.getOrNull(decodeLabel(query.data.value))?.label : null;
+  const label =
+    !query.error && query.data?.ok ? Option.getOrNull(decodeLabel(query.data.value))?.label : null;
+  const [open, setOpen] = useState(false);
   return (
-    <ThreadDetailsControl
-      onClick={() =>
-        useRightPanelStore.getState().openPlugin(threadRef, {
-          pluginId: plugin.pluginId,
-          panelId: item.panelId,
-          title: item.label,
-        })
-      }
-    >
-      <PuzzleIcon className="size-3 shrink-0" />
-      <span className="truncate">
-        {label ?? `${item.label}${query.error || query.data?.ok === false ? " · unavailable" : ""}`}
-      </span>
-    </ThreadDetailsControl>
+    <>
+      <ThreadDetailsControl part="select" multiline onClick={() => setOpen(true)}>
+        <PuzzleIcon className="size-4 shrink-0" />
+        <span className="min-w-0 text-left">
+          <span className="block">{item.label}</span>
+          <span className="block truncate text-xs text-muted-foreground">
+            {label ?? (query.isPending ? "Loading…" : "Unavailable")}
+          </span>
+        </span>
+      </ThreadDetailsControl>
+      <Dialog open={open} onOpenChange={setOpen}>
+        <DialogPopup>
+          <DialogHeader>
+            <DialogTitle>{item.label}</DialogTitle>
+          </DialogHeader>
+          <DialogPanel>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                setOpen(false);
+                useRightPanelStore.getState().openPlugin(threadRef, {
+                  pluginId: plugin.pluginId,
+                  panelId: item.panelId,
+                  title: item.label,
+                });
+              }}
+            >
+              Open in side panel
+            </Button>
+            {open && (
+              <PluginDocumentPanel
+                threadRef={threadRef}
+                pluginId={plugin.pluginId}
+                panelId={item.panelId}
+              />
+            )}
+          </DialogPanel>
+        </DialogPopup>
+      </Dialog>
+    </>
   );
 }
 
@@ -124,7 +199,7 @@ export function PluginDocumentPanel({
   const catalog = usePluginCatalog(threadRef);
   const plugin = catalog.data?.plugins.find((candidate) => candidate.pluginId === pluginId);
   const panel = plugin?.contributions.documentPanels.find((candidate) => candidate.id === panelId);
-  if (!plugin || !panel)
+  if (catalog.error || !plugin || !panel)
     return (
       <div className="p-4 text-sm text-muted-foreground">
         {catalog.isPending
@@ -134,7 +209,7 @@ export function PluginDocumentPanel({
     );
   return (
     <DocumentContent
-      key={`${plugin.pluginId}:${plugin.generation}:${panel.id}`}
+      key={`${threadRef.environmentId}:${threadRef.threadId}:${plugin.pluginId}:${plugin.generation}:${panel.id}`}
       threadRef={threadRef}
       plugin={plugin}
       panel={panel}
@@ -156,7 +231,8 @@ function DocumentContent({
       input: call(threadRef, plugin, panel.queryId),
     }),
   );
-  const document = query.data?.ok ? Option.getOrNull(decodeDocument(query.data.value)) : null;
+  const document =
+    !query.error && query.data?.ok ? Option.getOrNull(decodeDocument(query.data.value)) : null;
   const [actionError, setActionError] = useState<string | null>(null);
   return (
     <div className="h-full overflow-auto p-4">
@@ -239,6 +315,7 @@ function PluginActionControl({
   );
   const command = useAtomCommand(pluginEnvironment.command);
   const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const [open, setOpen] = useState(false);
   const available =
     action.kind === "panel" ||
@@ -249,14 +326,22 @@ function PluginActionControl({
     if (action.kind === "panel" || busy) return;
     setBusy(true);
     onError(null);
+    setError(null);
     const result = await command({
       environmentId: threadRef.environmentId,
       input: { ...call(threadRef, plugin, action.commandId, value), operationId: randomUUID() },
     });
     setBusy(false);
-    if (result._tag === "Failure") onError(String(squashAtomCommandFailure(result)));
-    else if (!result.value.ok) onError(result.value.error.message);
-    else {
+    const failure =
+      result._tag === "Failure"
+        ? String(squashAtomCommandFailure(result))
+        : result.value.ok
+          ? null
+          : result.value.error.message;
+    if (failure) {
+      setError(failure);
+      onError(failure);
+    } else {
       setOpen(false);
       onComplete();
     }
@@ -287,6 +372,11 @@ function PluginActionControl({
               <DialogTitle>{action.label}</DialogTitle>
             </DialogHeader>
             <DialogPanel>
+              {error && (
+                <p role="alert" className="mb-3 text-sm text-destructive">
+                  {error}
+                </p>
+              )}
               {open && (
                 <PluginPicker
                   threadRef={threadRef}
