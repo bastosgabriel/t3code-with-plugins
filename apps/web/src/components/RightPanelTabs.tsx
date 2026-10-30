@@ -1,3 +1,4 @@
+import { usePluginSurfaceActions } from "./plugins/PluginViews";
 import { sourceControlClients } from "@t3tools/client-runtime/source-control-clients";
 import type { EnvironmentThreadShell } from "@t3tools/client-runtime/state/shell";
 import { useProjects, useServerConfigs, useThreadShells } from "~/state/entities";
@@ -12,6 +13,7 @@ import type {
   ProjectId,
   PullRequestState,
   ResolvedKeybindingsConfig,
+  ScopedThreadRef,
 } from "@t3tools/contracts";
 import { getTerminalLabel } from "@t3tools/shared/terminalLabels";
 import {
@@ -95,6 +97,7 @@ import { observeResize } from "~/lib/observeResize";
 
 export interface RightPanelTabsProps {
   mode: PreviewPanelMode;
+  threadRef?: ScopedThreadRef | null;
   maximized?: boolean;
   open?: boolean;
   keybindings: ResolvedKeybindingsConfig;
@@ -294,6 +297,7 @@ function SurfaceMenuItem(props: {
 }
 
 function RightPanelEmptyState(props: {
+  pluginActions: ReturnType<typeof usePluginSurfaceActions>;
   onAddBrowser: () => void;
   onAddBrowserInProfile: (profileId: string) => void;
   browserProfiles: ReadonlyArray<{ readonly id: string; readonly name: string }>;
@@ -314,6 +318,7 @@ function RightPanelEmptyState(props: {
   const [highlight, setHighlight] = useState(-1);
 
   const actions = [
+    ...props.pluginActions,
     {
       label: "Browser",
       icon: Globe2,
@@ -478,7 +483,7 @@ function RightPanelEmptyState(props: {
                   >
                     {action.label}
                   </span>
-                  <Kbd>{action.shortcut}</Kbd>
+                  {action.shortcut && <Kbd>{action.shortcut}</Kbd>}
                 </button>
                 {action.label === "Browser" && props.browserProfiles.length > 1 ? (
                   <Menu>
@@ -519,7 +524,7 @@ function RightPanelEmptyState(props: {
                   >
                     {actionIcon(action, "size-4")}
                     <span className="min-w-0 flex-1 truncate">{action.label}</span>
-                    <Kbd>{action.shortcut}</Kbd>
+                    {action.shortcut && <Kbd>{action.shortcut}</Kbd>}
                   </div>
                 }
               />
@@ -945,6 +950,7 @@ function RightPanelTab(
 }
 
 export function RightPanelTabs(props: RightPanelTabsProps) {
+  const pluginActions = usePluginSurfaceActions(props.threadRef ?? null);
   const focusedSurface = props.surfaces.find((surface) => surface.id === props.activeSurfaceId);
   const ownsDesktopTitleBar = isElectron && props.mode === "inline";
   const browserProfiles = useBrowserDefaults().profiles;
@@ -1013,6 +1019,7 @@ export function RightPanelTabs(props: RightPanelTabsProps) {
   };
 
   const addSurfaceActions = [
+    ...pluginActions,
     {
       label: "Browser",
       icon: Globe2,
@@ -1434,6 +1441,7 @@ export function RightPanelTabs(props: RightPanelTabsProps) {
       <div className="flex min-h-0 flex-1 flex-col" data-right-panel-surface-content>
         {props.activeSurfaceId === null ? (
           <RightPanelEmptyState
+            pluginActions={pluginActions}
             onAddBrowser={props.onAddBrowser}
             onAddBrowserInProfile={props.onAddBrowserInProfile}
             browserProfiles={browserProfiles}
