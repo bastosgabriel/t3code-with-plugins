@@ -60,88 +60,92 @@ function PluginManagement({ environmentId }: { environmentId: EnvironmentId }) {
   return (
     <>
       <SettingsSection title="Plugins" id="plugins">
-        <p className="text-sm text-muted-foreground">
-          Install a local plugin folder on this environment. Plugins run with the server's
-          filesystem access; install only code you trust. Updates and rollbacks take effect after
-          you restart the server.
-        </p>
-        <div className="mt-3 flex gap-2">
-          <div className="min-w-0 flex-1">
-            <Input
-              aria-label="Plugin folder"
-              placeholder="Plugin folder on the server"
-              value={directory}
-              onChange={(event) => setDirectory(event.target.value)}
-            />
-          </div>
-          <Button
-            disabled={!allowed || busy || !directory.trim()}
-            onClick={() => {
-              void execute({ action: "install", directory: directory.trim() });
-            }}
-          >
-            Install
-          </Button>
-        </div>
-        <p role="alert" className="mt-2 text-sm text-destructive">
-          {error ?? query.error}
-        </p>
-        {(query.data ?? []).map((installed) => (
-          <div key={installed.manifest.id} className="mt-4 space-y-2 rounded-md border p-3">
-            <h3 className="font-medium">
-              {installed.manifest.name}{" "}
-              <span className="text-muted-foreground">{installed.manifest.version}</span>
-            </h3>
-            <p className="text-sm text-muted-foreground">
-              {installed.active ? "Active" : installed.enabled ? "Activation failed" : "Disabled"}
-              {installed.pendingVersion ? ` · ${installed.pendingVersion} pending restart` : ""}
-              {installed.error ? ` · ${installed.error}` : ""}
-            </p>
-            <div className="flex flex-wrap gap-2">
-              <Button
-                variant="outline"
-                size="sm"
-                disabled={!allowed || busy}
-                onClick={() => {
-                  void execute({
-                    action: installed.enabled ? "disable" : "enable",
-                    pluginId: installed.manifest.id,
-                  });
-                }}
-              >
-                {installed.enabled ? "Disable" : "Enable"}
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                disabled={!allowed || busy}
-                onClick={() => {
-                  void execute({ action: "rollback", pluginId: installed.manifest.id });
-                }}
-              >
-                Stage rollback
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                disabled={!allowed || busy}
-                onClick={() => {
-                  void execute({
-                    action: "remove",
-                    pluginId: installed.manifest.id,
-                    clearConfiguration,
-                  });
-                }}
-              >
-                Remove
-              </Button>
+        <div className="space-y-4 p-3 sm:p-4">
+          <p className="text-sm text-muted-foreground">
+            Install a local plugin folder on this environment. Plugins run with the server's
+            filesystem access; install only code you trust. Updates and rollbacks take effect after
+            you restart the server.
+          </p>
+          <div className="flex gap-2">
+            <div className="min-w-0 flex-1">
+              <Input
+                aria-label="Plugin folder"
+                placeholder="Plugin folder on the server"
+                value={directory}
+                onChange={(event) => setDirectory(event.target.value)}
+              />
             </div>
+            <Button
+              disabled={!allowed || busy || !directory.trim()}
+              onClick={() => {
+                void execute({ action: "install", directory: directory.trim() });
+              }}
+            >
+              Install
+            </Button>
           </div>
-        ))}
-        <label className="mt-4 flex items-center gap-2 text-sm">
-          <Switch checked={clearConfiguration} onCheckedChange={setClearConfiguration} />
-          Also delete plugin settings when removing. Plugin data is always kept.
-        </label>
+          {(error ?? query.error) && (
+            <p role="alert" className="text-sm text-destructive">
+              {error ?? query.error}
+            </p>
+          )}
+          {(query.data ?? []).map((installed) => (
+            <div key={installed.manifest.id} className="space-y-2 rounded-md border p-3">
+              <h3 className="font-medium">
+                {installed.manifest.name}{" "}
+                <span className="text-muted-foreground">{installed.manifest.version}</span>
+              </h3>
+              <p className="text-sm text-muted-foreground">
+                {installed.active ? "Active" : installed.enabled ? "Activation failed" : "Disabled"}
+                {installed.pendingVersion ? ` · ${installed.pendingVersion} pending restart` : ""}
+                {installed.error ? ` · ${installed.error}` : ""}
+              </p>
+              <div className="flex flex-wrap gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  disabled={!allowed || busy}
+                  onClick={() => {
+                    void execute({
+                      action: installed.enabled ? "disable" : "enable",
+                      pluginId: installed.manifest.id,
+                    });
+                  }}
+                >
+                  {installed.enabled ? "Disable" : "Enable"}
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  disabled={!allowed || busy}
+                  onClick={() => {
+                    void execute({ action: "rollback", pluginId: installed.manifest.id });
+                  }}
+                >
+                  Stage rollback
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  disabled={!allowed || busy}
+                  onClick={() => {
+                    void execute({
+                      action: "remove",
+                      pluginId: installed.manifest.id,
+                      clearConfiguration,
+                    });
+                  }}
+                >
+                  Remove
+                </Button>
+              </div>
+            </div>
+          ))}
+          <label className="flex items-center gap-3 text-sm">
+            <Switch checked={clearConfiguration} onCheckedChange={setClearConfiguration} />
+            <span>Also delete plugin settings when removing. Plugin data is always kept.</span>
+          </label>
+        </div>
       </SettingsSection>
       {catalog.data?.plugins.flatMap((plugin) =>
         plugin.contributions.settings.map((settings) => (
@@ -195,7 +199,7 @@ function PluginSettingsForm({
           onSave={query.refresh}
         />
       ) : (
-        <p className="text-sm text-muted-foreground">
+        <p className="p-3 text-sm text-muted-foreground sm:p-4">
           {query.error ??
             (query.data?.ok === false ? query.data.error.message : "Loading settings…")}
         </p>
@@ -243,9 +247,9 @@ function SettingsEditor({
     else onSave();
   };
   return (
-    <div className="space-y-3">
+    <div className="space-y-4 p-3 sm:p-4">
       {settings.fields.map((field) => (
-        <label key={field.key} className="block space-y-1 text-sm">
+        <label key={field.key} className="block space-y-1.5 text-sm">
           <span>{field.label}</span>
           {field.type === "boolean" ? (
             <Switch
