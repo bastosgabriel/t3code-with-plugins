@@ -132,6 +132,7 @@ export interface ThreadItemContribution {
 export type PluginThreadItemState = {
   label: string;
   action?: PluginAction;
+  actions?: readonly PluginAction[];
 };
 
 export interface DocumentPanelContribution {

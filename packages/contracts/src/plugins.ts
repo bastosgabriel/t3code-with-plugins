@@ -95,6 +95,7 @@ export type PluginAction = typeof PluginAction.Type;
 export const PluginThreadItemState = Schema.Struct({
   label: Schema.String,
   action: Schema.optionalKey(PluginAction),
+  actions: Schema.optionalKey(Schema.Array(PluginAction)),
 });
 export type PluginThreadItemState = typeof PluginThreadItemState.Type;
 export const PluginContributions = Schema.Struct({

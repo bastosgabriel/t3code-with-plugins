@@ -47,6 +47,7 @@ import { OrchestratorToolkit } from "../../apps/server/src/mcp/toolkits/orchestr
 import { PreviewToolkit } from "../../apps/server/src/mcp/toolkits/preview/tools.ts";
 import { PreviewControlsToolkit } from "../../apps/server/src/mcp/toolkits/previewControls/tools.ts";
 import { ProjectToolkit } from "../../apps/server/src/mcp/toolkits/project/tools.ts";
+import { bindingInstructions } from "../../plugins/obsidian-tickets/src/instructions.ts";
 import { PluginToolkit } from "../../apps/server/src/mcp/toolkits/plugins/tools.ts";
 import {
   CHILD_PULL_REQUEST_REPORT_NEXT,
@@ -245,6 +246,7 @@ export const McpToolUseCase = Schema.Struct({
      * Canned tool results by bare name, T3 or native. `"default"` uses the runner's result. For a
      * device tool, a T3 `DeviceError` (`{"_tag": ..., "cause": null}`) fails it inside T3.
      */
+    ticketPlugin: Schema.optional(Schema.Boolean),
     mocks: Schema.optional(Schema.Record(Schema.String, Schema.Unknown)),
     /** Regexes on one part of a shell command. A match wins over the shell simulator. */
     shellMocks: Schema.optional(
@@ -1273,7 +1275,36 @@ const answerToolCall = Effect.fn("evaluateMcpToolUse.answerToolCall")(function* 
     if (found.length === 0) return toolResult(call.id, "No matching deferred tools found");
     return loadTools(tools, call.id, found);
   }
-  const mock = testCase.setup.mocks?.[name];
+  let mock = testCase.setup.mocks?.[name];
+  if (testCase.setup.ticketPlugin && name === "plugin_catalog" && isRecord(mock)) {
+    mock = {
+      ...mock,
+      plugins: Array.isArray(mock.plugins)
+        ? mock.plugins.map((plugin) => {
+            if (
+              !isRecord(plugin) ||
+              !isRecord(plugin.contributions) ||
+              !Array.isArray(plugin.contributions.operations)
+            )
+              return plugin;
+            return {
+              ...plugin,
+              contributions: {
+                ...plugin.contributions,
+                operations: plugin.contributions.operations.map((operation) =>
+                  isRecord(operation) && operation.id === "binding.set"
+                    ? { ...operation, summary: bindingInstructions }
+                    : operation,
+                ),
+              },
+            };
+          })
+        : [],
+    };
+  }
+  if (testCase.setup.ticketPlugin && name === "plugin_query" && isRecord(mock)) {
+    mock = mock[String(input.operation)] ?? mock;
+  }
   // T3 answers device calls from the world. A mock that is a T3 device error fails inside T3.
   const failure = deviceFailure(mock);
   const fromWorld = mock === undefined || mock === "default" || failure !== undefined;

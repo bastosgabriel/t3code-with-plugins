@@ -133,6 +133,7 @@ it("persists bindings, rejects stale revisions and replays operation receipts wi
     input: {},
   };
   expect(value(await f.query("binding.get")).action).toEqual(selection);
+  expect(value(await f.query("binding.get")).actions).toEqual([selection]);
   const first = await f.bind("T-1", 0, "first");
   expect(value(first).revision).toBe(1);
   expect(await f.bind("T-1", 0, "first")).toEqual(first);
@@ -141,6 +142,15 @@ it("persists bindings, rejects stale revisions and replays operation receipts wi
   expect(error(await f.bind("T-2", 0, "stale"))).toBe("binding_conflict");
   await f.start();
   expect(value(await f.query("binding.get")).ticket).toEqual(ticket("T-1"));
+  expect(value(await f.query("binding.get")).actions).toEqual([
+    selection,
+    {
+      kind: "command",
+      label: "Unlink",
+      commandId: "binding.clear",
+      input: { expectedBindingRevision: 1 },
+    },
+  ]);
   expect(value(await f.query("binding.get")).action).toEqual({
     kind: "panel",
     label: "Ticket",
@@ -155,6 +165,7 @@ it("persists bindings, rejects stale revisions and replays operation receipts wi
   ).toBeNull();
   expect((await f.documents()).docs["T-2"]!.references).toEqual([]);
   expect(value(await f.query("binding.get")).action).toEqual(selection);
+  expect(value(await f.query("binding.get")).actions).toEqual([selection]);
 });
 
 it("recovers an interrupted repair using the complete original ticket set after restarting", async () => {
@@ -165,6 +176,15 @@ it("recovers an interrupted repair using the complete original ticket set after 
   expect(error(await f.bind("T-2", 1, "retry"))).toBe("recovery_required");
   expect((await f.documents()).calls).toBe(2);
   expect(value(await f.query("binding.get")).ticket).toEqual(ticket("T-1"));
+  expect(value(await f.query("binding.get")).actions).toEqual([
+    {
+      kind: "picker",
+      label: "Repair references",
+      queryId: "recovery.choices",
+      commandId: "recovery.apply",
+      input: {},
+    },
+  ]);
   const choices = value(await f.query("recovery.choices", { search: "" })).items as {
     key: string;
   }[];

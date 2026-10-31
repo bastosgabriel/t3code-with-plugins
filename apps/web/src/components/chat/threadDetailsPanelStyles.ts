@@ -45,3 +45,7 @@ export const THREAD_DETAILS_PANEL_SPLIT_SECONDARY_CLASS = `${THREAD_DETAILS_PANE
 // The split hairline shows only while the pair is in use, so resting rows read as plain rows.
 export const THREAD_DETAILS_PANEL_SPLIT_SEPARATOR_CLASS =
   "h-4 w-px shrink-0 bg-transparent group-hover/details-split:bg-border/65 group-has-[[data-popup-open]]/details-split:bg-border/65";
+
+export const THREAD_DETAILS_PANEL_UNIFORM_GROUP_CLASS = `flex w-full items-stretch rounded-lg ${THREAD_DETAILS_PANEL_SPLIT_GROUP_SURFACE_CLASS}`;
+export const THREAD_DETAILS_PANEL_UNIFORM_PRIMARY_CLASS = `${THREAD_DETAILS_PANEL_CONTROL_CLASS} w-full justify-start rounded-e-none bg-transparent shadow-none`;
+export const THREAD_DETAILS_PANEL_UNIFORM_SECONDARY_CLASS = `${THREAD_DETAILS_PANEL_CONTROL_CLASS} h-auto w-8 justify-center rounded-s-none bg-transparent px-0 shadow-none`;

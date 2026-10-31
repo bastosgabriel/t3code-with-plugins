@@ -13,6 +13,8 @@ import type {
   ThreadContext,
 } from "@t3tools/plugin-api";
 
+import { bindingInstructions } from "./instructions.ts";
+
 type TicketKey = { vaultId: string; boardId: string; ticketId: string };
 type Binding = { revision: number; ticket: TicketKey | null };
 type Receipt = {
@@ -506,6 +508,30 @@ export async function activate(api: PluginApi): Promise<void> {
         ...selected,
         ...({
           label,
+          actions:
+            recoveries(context).length > 0
+              ? [
+                  {
+                    kind: "picker",
+                    label: "Repair references",
+                    queryId: "recovery.choices",
+                    commandId: "recovery.apply",
+                    input: {},
+                  },
+                ]
+              : [
+                  selectTicket,
+                  ...(selected.ticket
+                    ? [
+                        {
+                          kind: "command" as const,
+                          label: "Unlink",
+                          commandId: "binding.clear",
+                          input: { expectedBindingRevision: selected.revision },
+                        },
+                      ]
+                    : []),
+                ],
           action: selected.ticket
             ? { kind: "panel", label: "Ticket", panelId: "ticket" }
             : selectTicket,
@@ -762,8 +788,7 @@ export async function activate(api: PluginApi): Promise<void> {
     id: "binding.set",
     kind: "command",
     scope: "thread",
-    summary:
-      "Link a selected ticket to this thread after an explicit user request. Read binding.get and ticket.search first.",
+    summary: bindingInstructions,
     inputSchema: object({ key: string }),
     outputSchema: {},
     requiredAccess: ["thread.operate", "filesystem.read", "filesystem.write"],

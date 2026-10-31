@@ -20,8 +20,10 @@ import { pluginEnvironment } from "../../state/plugins";
 import { useEnvironmentQuery } from "../../state/query";
 import { useAtomCommand } from "../../state/use-atom-command";
 import { useRightPanelStore } from "../../rightPanelStore";
+import { THREAD_DETAILS_PANEL_UNIFORM_GROUP_CLASS } from "../chat/threadDetailsPanelStyles";
 import { ThreadDetailsControl } from "../chat/ThreadDetailsControl";
 import { Button } from "../ui/button";
+import { Menu, MenuItem, MenuPopup, MenuTrigger } from "../ui/menu";
 import { Input } from "../ui/input";
 import { Dialog, DialogPopup, DialogHeader, DialogTitle, DialogPanel } from "../ui/dialog";
 import ChatMarkdown from "../ChatMarkdown";
@@ -223,7 +225,7 @@ export function PluginThreadItems({ threadRef }: { threadRef: ScopedThreadRef })
   return (
     <ThreadDetailsSection headingId="plugin-thread-items" title="Plugins" showHeading={false}>
       <div>
-        {catalog.data?.plugins.flatMap((plugin) =>
+        {(catalog.error ? [] : catalog.data?.plugins)?.flatMap((plugin) =>
           plugin.contributions.threadItems.map((item) => (
             <PluginThreadItem
               key={`${threadRef.environmentId}:${threadRef.threadId}:${plugin.pluginId}:${plugin.generation}:${item.id}`}
@@ -260,21 +262,78 @@ function PluginThreadItem({
       input: call(threadRef, plugin, item.queryId),
     }),
   );
-  const label =
-    !query.error && query.data?.ok ? Option.getOrNull(decodeLabel(query.data.value))?.label : null;
+  const state =
+    !query.error && query.data?.ok ? Option.getOrNull(decodeLabel(query.data.value)) : null;
+  const label = state?.label;
   const [open, setOpen] = useState(false);
+  const [actionError, setActionError] = useState<string | null>(null);
   return (
     <>
-      <ThreadDetailsControl multiline onClick={() => setOpen(true)}>
-        <PuzzleIcon className="size-4 shrink-0" />
-        <span className="min-w-0 flex-1 text-left">
-          <span className="block">{item.label}</span>
-          <span className="block truncate text-xs text-muted-foreground">
-            {label ?? (query.isPending ? "Loading…" : "Unavailable")}
-          </span>
-        </span>
-        <ChevronDownIcon className="size-4 shrink-0 text-muted-foreground" />
-      </ThreadDetailsControl>
+      <div className={THREAD_DETAILS_PANEL_UNIFORM_GROUP_CLASS}>
+        <div className="min-w-0 flex-1">
+          <ThreadDetailsControl
+            multiline
+            part="uniformPrimary"
+            aria-label={item.label}
+            onClick={() => setOpen(true)}
+          >
+            <PuzzleIcon className="size-4 shrink-0" />
+            <span className="min-w-0 flex-1 text-left">
+              <span className="block">{item.label}</span>
+              <span className="block truncate text-xs text-muted-foreground">
+                {label ?? (query.isPending ? "Loading…" : "Unavailable")}
+              </span>
+            </span>
+          </ThreadDetailsControl>
+        </div>
+        <Menu>
+          <MenuTrigger
+            render={
+              <ThreadDetailsControl
+                part="uniformSecondary"
+                aria-label={`${item.label} options`}
+                disabled={!state}
+              />
+            }
+          >
+            <ChevronDownIcon className="size-4" />
+          </MenuTrigger>
+          <MenuPopup align="end" keepMounted>
+            {(state?.actions ?? []).map((action) => (
+              <PluginActionControl
+                key={`${action.kind}:${action.label}`}
+                threadRef={threadRef}
+                plugin={plugin}
+                action={action}
+                input={action.kind === "panel" ? {} : action.input}
+                onError={setActionError}
+                onComplete={() => {
+                  setActionError(null);
+                  query.refresh();
+                }}
+                menuItem
+              />
+            ))}
+            <MenuItem
+              onClick={() => {
+                setOpen(false);
+                useRightPanelStore.getState().openPlugin(threadRef, {
+                  pluginId: plugin.pluginId,
+                  panelId: item.panelId,
+                  title: item.label,
+                });
+              }}
+            >
+              Open in side panel
+            </MenuItem>
+          </MenuPopup>
+        </Menu>
+      </div>
+      {actionError && (
+        <p role="alert" className="text-xs text-destructive">
+          {actionError}
+        </p>
+      )}
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogPopup>
           <DialogHeader>
@@ -426,6 +485,7 @@ function PluginActionControl({
   onError,
   initialOpen = false,
   onClose,
+  menuItem = false,
 }: {
   threadRef: ScopedThreadRef;
   plugin: Plugin;
@@ -435,6 +495,7 @@ function PluginActionControl({
   onError: (message: string | null) => void;
   initialOpen?: boolean;
   onClose?: () => void;
+  menuItem?: boolean;
 }) {
   const canOperate = useAtomValue(
     pluginEnvironment.command.permissionAtom(threadRef.environmentId),
@@ -481,27 +542,29 @@ function PluginActionControl({
       onComplete();
     }
   };
+  const triggerProps = {
+    disabled: busy || !available || (action.kind !== "panel" && !canOperate),
+    onClick: () => {
+      if (action.kind === "panel")
+        useRightPanelStore.getState().openPlugin(threadRef, {
+          pluginId: plugin.pluginId,
+          panelId: action.panelId,
+          title: action.label,
+        });
+      else if (action.kind === "picker") setOpen(true);
+      else void execute(input);
+    },
+  };
   return (
     <div>
-      {!initialOpen && (
-        <Button
-          variant="outline"
-          size="sm"
-          disabled={busy || !available || (action.kind !== "panel" && !canOperate)}
-          onClick={() => {
-            if (action.kind === "panel")
-              useRightPanelStore.getState().openPlugin(threadRef, {
-                pluginId: plugin.pluginId,
-                panelId: action.panelId,
-                title: action.label,
-              });
-            else if (action.kind === "picker") setOpen(true);
-            else void execute(input);
-          }}
-        >
-          {action.label}
-        </Button>
-      )}
+      {!initialOpen &&
+        (menuItem ? (
+          <MenuItem {...triggerProps}>{action.label}</MenuItem>
+        ) : (
+          <Button variant="outline" size="sm" {...triggerProps}>
+            {action.label}
+          </Button>
+        ))}
       {action.kind === "picker" && (
         <Dialog
           open={open}
