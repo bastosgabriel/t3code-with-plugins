@@ -1,0 +1,4 @@
+interface:
+  display_name: "Atualizar T3 Code com upstream"
+  short_description: "Sincroniza o fork preservando a API dos plugins"
+  default_prompt: "Use $update-upstream para integrar upstream/main à main do fork, resolver conflitos e validar a compatibilidade sem alterar o contrato público nem os plugins."
