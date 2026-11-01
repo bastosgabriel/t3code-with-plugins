@@ -334,36 +334,55 @@ function PluginThreadItem({
           {actionError}
         </p>
       )}
-      <Dialog open={open} onOpenChange={setOpen}>
-        <DialogPopup>
-          <DialogHeader>
-            <DialogTitle>{item.label}</DialogTitle>
-          </DialogHeader>
-          <DialogPanel>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => {
-                setOpen(false);
-                useRightPanelStore.getState().openPlugin(threadRef, {
-                  pluginId: plugin.pluginId,
-                  panelId: item.panelId,
-                  title: item.label,
-                });
-              }}
-            >
-              Open in side panel
-            </Button>
-            {open && (
-              <PluginDocumentPanel
-                threadRef={threadRef}
-                pluginId={plugin.pluginId}
-                panelId={item.panelId}
-              />
-            )}
-          </DialogPanel>
-        </DialogPopup>
-      </Dialog>
+      {state?.action?.kind === "picker" ? (
+        open && (
+          <PluginActionControl
+            threadRef={threadRef}
+            plugin={plugin}
+            action={state.action}
+            input={state.action.input}
+            initialOpen
+            onClose={() => setOpen(false)}
+            onError={setActionError}
+            onComplete={() => {
+              setOpen(false);
+              setActionError(null);
+              query.refresh();
+            }}
+          />
+        )
+      ) : (
+        <Dialog open={open} onOpenChange={setOpen}>
+          <DialogPopup>
+            <DialogHeader>
+              <DialogTitle>{item.label}</DialogTitle>
+            </DialogHeader>
+            <DialogPanel>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  setOpen(false);
+                  useRightPanelStore.getState().openPlugin(threadRef, {
+                    pluginId: plugin.pluginId,
+                    panelId: item.panelId,
+                    title: item.label,
+                  });
+                }}
+              >
+                Open in side panel
+              </Button>
+              {open && (
+                <PluginDocumentPanel
+                  threadRef={threadRef}
+                  pluginId={plugin.pluginId}
+                  panelId={item.panelId}
+                />
+              )}
+            </DialogPanel>
+          </DialogPopup>
+        </Dialog>
+      )}
     </>
   );
 }

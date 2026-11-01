@@ -32,7 +32,7 @@ function setup() {
   state.query.mockReset();
 }
 
-it("opens options without dispatching the primary popup or a binding command", async () => {
+it("opens the primary picker directly and keeps options and linked-ticket details separate", async () => {
   setup();
   state.command.mockResolvedValue({
     _tag: "Success",
@@ -49,6 +49,7 @@ it("opens options without dispatching the primary popup or a binding command", a
     commandId: "binding.set",
     input: {},
   };
+  let linked = false;
   state.query.mockImplementation((request: unknown) => ({
     isPending: false,
     error: request === "catalog" ? catalogError : null,
@@ -79,7 +80,11 @@ it("opens options without dispatching the primary popup or a binding command", a
                     items: [{ key: "verified-key", label: "T-1 · Fixture", detail: "board" }],
                     nextCursor: null,
                   }
-                : { label: "No ticket linked", actions: [action] },
+                : {
+                    label: linked ? "T-1 · Fixture" : "No ticket linked",
+                    action: linked ? { kind: "panel", label: "Ticket", panelId: "ticket" } : action,
+                    actions: [action],
+                  },
           },
   }));
   await using screen = await render(
@@ -87,6 +92,14 @@ it("opens options without dispatching the primary popup or a binding command", a
       threadRef={{ environmentId: "env", threadId: "thread" } as ScopedThreadRef}
     />,
   );
+  await screen.getByRole("button", { name: "Ticket", exact: true }).click();
+  await expect
+    .element(page.getByRole("dialog", { name: "Select ticket", exact: true }))
+    .toBeVisible();
+  await expect.element(page.getByRole("button", { name: /T-1/ })).toBeVisible();
+  expect(state.command).not.toHaveBeenCalled();
+  await userEvent.keyboard("{Escape}");
+  await expect.element(page.getByRole("dialog")).not.toBeInTheDocument();
   const arrow =
     screen.container.querySelector("[data-slot=select-icon]") ??
     screen.getByRole("button", { name: "Ticket options" }).element();
@@ -114,6 +127,7 @@ it("opens options without dispatching the primary popup or a binding command", a
     operation: "binding.set",
     input: { key: "verified-key" },
   });
+  linked = true;
   state.allowed = false;
   await screen.rerender(
     <PluginThreadItems
