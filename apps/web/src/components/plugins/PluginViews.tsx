@@ -675,7 +675,7 @@ function PluginPicker({
               disabled={busy || query.isPending}
               onClick={() => onSelect(item.key)}
             >
-              <span className="min-w-0 text-left">
+              <span className="min-w-0 flex-1 text-left">
                 <span className="block break-words">{item.label}</span>
                 <span className="block break-all text-muted-foreground">{item.detail}</span>
               </span>
