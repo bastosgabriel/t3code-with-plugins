@@ -548,6 +548,7 @@ export async function activate(api: PluginApi): Promise<void> {
       const args = record(input);
       const result = await workflow(config, context.projectDirectory, {
         operation: "search",
+        sort: "created_desc",
         search: args.search,
         cursor: args.cursor,
       });
