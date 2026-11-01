@@ -552,7 +552,12 @@ export async function activate(api: PluginApi): Promise<void> {
         cursor: args.cursor,
       });
       if (!Array.isArray(result.items))
-        return failure("search_failed", "The project boards could not be searched.");
+        return failure(
+          "search_failed",
+          typeof result.error === "string" && result.error
+            ? `The project boards could not be searched: ${result.error}`
+            : "The project boards could not be searched.",
+        );
       return success({
         items: result.items.map((value) => {
           const item = record(value),
