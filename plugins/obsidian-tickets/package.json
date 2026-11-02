@@ -5,8 +5,9 @@
   "type": "module",
   "scripts": {
     "typecheck": "tsc --noEmit",
-    "build": "vp pack src/index.ts --no-config --out-dir dist --format esm && cp manifest.json dist/manifest.json",
-    "test": "vp test run"
+    "build": "vp pack && cp manifest.json dist/manifest.json",
+    "test": "vp test run",
+    "test:writer": "python3 -m pytest test/test_thread_references.py"
   },
   "devDependencies": {
     "@t3tools/plugin-api": "workspace:*",

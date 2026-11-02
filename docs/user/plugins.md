@@ -12,9 +12,13 @@ one keeps its durable data; you can choose whether to delete its settings.
 
 ## Obsidian tickets
 
-The ticket plugin needs the installed vault workflow with its thread-reference
-writer. Configure the writer path and Python executable in the plugin's settings.
-The workflow's existing machine configuration locates the vault and project boards.
+The ticket plugin includes its thread-reference writer. It still needs Python and
+the installed vault workflow for ticket validation and vault access. The workflow's
+existing machine configuration locates the vault and project boards. Leave the
+writer override empty in the plugin settings to use the bundled writer.
+
+The workflow defaults to `~/.codex/skills/vault-manage-ticket`. For a different
+installation, set `T3_OBSIDIAN_WORKFLOW_DIR` on the environment's server.
 
 Open **Ticket** from a thread's details and select a ticket. Search results identify
 their board when several boards share the project. The panel shows the ticket's

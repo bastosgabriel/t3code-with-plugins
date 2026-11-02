@@ -13,6 +13,8 @@ import type {
   ThreadContext,
 } from "@t3tools/plugin-api";
 
+import writerSource from "../python/thread_references.py?raw";
+
 import { bindingInstructions } from "./instructions.ts";
 
 type TicketKey = { vaultId: string; boardId: string; ticketId: string };
@@ -27,6 +29,17 @@ type Receipt = {
 };
 type State = { version: 1; bindings: Record<string, Binding>; operations: Record<string, Receipt> };
 type Configuration = { writerPath: string; python: string; revision: number };
+
+const writerPath = (value: unknown) =>
+  value === undefined ||
+  value === "" ||
+  value ===
+    NodePath.join(
+      NodeOS.homedir(),
+      ".codex/skills/vault-manage-ticket/scripts/thread_references.py",
+    )
+    ? ""
+    : text(value);
 
 const empty = {
   type: "object",
@@ -155,7 +168,8 @@ function workflow(
   request: Record<string, unknown>,
 ): Promise<Record<string, unknown>> {
   return new Promise((resolve, reject) => {
-    const child = NodeChildProcess.spawn(config.python, [config.writerPath, "--repo", repo], {
+    const args = config.writerPath ? [config.writerPath] : ["-c", writerSource];
+    const child = NodeChildProcess.spawn(config.python, [...args, "--repo", repo], {
       stdio: ["pipe", "pipe", "pipe"],
     });
     const chunks: Buffer[] = [];
@@ -187,13 +201,7 @@ export async function activate(api: PluginApi): Promise<void> {
   const savedConfig = await readJson(configFile);
   const source = savedConfig === undefined ? {} : record(savedConfig);
   let config: Configuration = {
-    writerPath:
-      source.writerPath === undefined
-        ? NodePath.join(
-            NodeOS.homedir(),
-            ".codex/skills/vault-manage-ticket/scripts/thread_references.py",
-          )
-        : text(source.writerPath),
+    writerPath: writerPath(source.writerPath),
     python: source.python === undefined ? "python3" : text(source.python),
     revision: source.revision === undefined ? 0 : revision(source.revision),
   };
@@ -853,7 +861,7 @@ export async function activate(api: PluginApi): Promise<void> {
         if (revision(args.revision) !== config.revision)
           return failure("configuration_conflict", "Settings changed; read them again.");
         const next = {
-          writerPath: text(args.writerPath),
+          writerPath: writerPath(args.writerPath),
           python: text(args.python),
           revision: config.revision + 1,
         };
@@ -897,7 +905,7 @@ export async function activate(api: PluginApi): Promise<void> {
     queryId: "configuration.get",
     commandId: "configuration.set",
     fields: [
-      { key: "writerPath", type: "text", label: "Installed workflow writer" },
+      { key: "writerPath", type: "text", label: "Writer override (empty uses bundled writer)" },
       { key: "python", type: "text", label: "Python command" },
     ],
   });
