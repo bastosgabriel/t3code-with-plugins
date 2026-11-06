@@ -6,6 +6,7 @@ import {
   ThreadId,
   IsoDateTime,
 } from "@t3tools/contracts";
+import * as NodeCrypto from "@effect/platform-node/NodeCrypto";
 import * as NodeServices from "@effect/platform-node/NodeServices";
 import * as Effect from "effect/Effect";
 import * as FileSystem from "effect/FileSystem";
@@ -55,7 +56,7 @@ const layerTest = () =>
       ),
     ),
     Layer.provideMerge(ServerConfig.layerTest(process.cwd(), { prefix: "t3-plugin-host-" })),
-    Layer.provideMerge(NodeServices.layer),
+    Layer.provideMerge(Layer.mergeAll(NodeServices.layer, NodeCrypto.layer)),
   );
 const manifest = {
   id: "fixture",
@@ -225,7 +226,7 @@ it.effect(
             getEnvironmentId: Effect.succeed(environmentId),
           }),
           ServerConfig.layerTest(process.cwd(), { prefix: "t3-plugin-restart-" }),
-        ).pipe(Layer.provideMerge(NodeServices.layer)),
+        ).pipe(Layer.provideMerge(Layer.mergeAll(NodeServices.layer, NodeCrypto.layer))),
       ),
     ),
 );

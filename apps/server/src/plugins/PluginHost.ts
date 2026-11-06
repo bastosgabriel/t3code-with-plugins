@@ -20,7 +20,7 @@ import {
 import type { PluginAccess, PluginContext, PluginModule } from "@t3tools/plugin-api";
 import { formatThreadLink } from "@t3tools/shared/threadLinks";
 import * as Context from "effect/Context";
-import * as Crypto from "effect/Crypto";
+import * as SecureRandom from "effect/crypto/SecureRandom";
 import * as Effect from "effect/Effect";
 import * as FileSystem from "effect/FileSystem";
 import * as Layer from "effect/Layer";
@@ -117,7 +117,7 @@ const make = Effect.gen(function* () {
   const environment = yield* ServerEnvironment.ServerEnvironment;
   const projects = yield* ProjectStore.ProjectStoreV2;
   const projections = yield* ProjectionStore.ProjectionStoreV2;
-  const crypto = yield* Crypto.Crypto;
+  const random = yield* SecureRandom.SecureRandom;
   const lock = yield* Semaphore.make(1);
   const root = path.join(config.stateDir, "plugins");
   const records = new Map<string, InstalledRecord>();
@@ -192,7 +192,7 @@ const make = Effect.gen(function* () {
       catch: pluginFailure("load_failed", id),
     });
     loaded.add(id);
-    const generation = yield* crypto.randomUUIDv4();
+    const generation = yield* random.uuidV4();
     const activation = yield* Effect.tryPromise({
       try: () =>
         activatePlugin(module, {
@@ -280,7 +280,7 @@ const make = Effect.gen(function* () {
         const record = records.get(manifest.id);
         if (!record && loaded.has(manifest.id))
           return yield* new PluginError({ code: "restart_required", pluginId: manifest.id });
-        const bundleFile = `${yield* crypto.randomUUIDv4()}.mjs`;
+        const bundleFile = `${yield* random.uuidV4()}.mjs`;
         const target = path.join(directory(manifest.id), bundleFile);
         yield* fs.copyFile(source, target + ".tmp");
         yield* fs.rename(target + ".tmp", target);

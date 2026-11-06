@@ -13,6 +13,7 @@ import type {
 } from "@t3tools/plugin-api";
 import { compilePluginSchema } from "./pluginSchema.ts";
 
+// @effect-diagnostics-next-line extendsNativeError:off - Promise plugin boundary; PluginHost translates this sentinel into PluginError.
 export class PluginActivationError extends Error {
   readonly code: string;
   constructor(code: string) {
