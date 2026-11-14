@@ -1,14 +1,17 @@
 ---
 name: update-upstream
-description: Atualiza a main deste fork com upstream/main, resolve conflitos e adapta a integração com o T3 Code preservando o contrato público e os plugins existentes. Use para executar uma sincronização com upstream; uma consulta de novidades ou pedido para editar esta skill não inicia a sincronização.
+description: Atualiza a main deste fork com upstream/main, resolve conflitos e compila e instala o desktop Linux preservando o contrato público e os plugins existentes, deixando apenas o reinício manual. Use para executar uma sincronização com upstream; uma consulta de novidades ou pedido para editar esta skill não inicia a sincronização.
 ---
 
 # Atualizar o fork com upstream
 
-Integre upstream/main à main do fork, valide e publique em origin/main. A invocação
-para executar a atualização autoriza esse fluxo completo, sem pedir confirmação a
-cada etapa. Respeite pedidos de somente análise ou trabalho local. Não publique no
-upstream, não crie PR sem pedido e não atualize a instalação em uso.
+Integre upstream/main à main do fork, valide, publique em origin/main e prepare a
+nova instalação desktop Linux. A invocação para executar a atualização autoriza
+esse fluxo completo, incluindo revisão, validação, commit e push das mudanças
+pendentes do checkout principal, build e instalação, sem pedir confirmação a cada
+etapa. Respeite pedidos de somente análise ou trabalho local. Não publique no
+upstream nem crie PR sem pedido. Não encerre ou reinicie o aplicativo em uso:
+Gabriel fará apenas o reinício quando a nova versão estiver pronta.
 
 ## Limite de compatibilidade
 
@@ -35,23 +38,36 @@ absorver essas mudanças, mantendo o mesmo contrato visto pelos plugins.
 ## Preparar e escolher a estratégia
 
 1. Leia AGENTS.md e CLAUDE.md aplicáveis. Confira status, remotes, worktrees e
-   operações Git em andamento. Preserve alterações alheias; não use reset, clean,
-   stash automático ou commits que capturem arquivos não relacionados.
+   operações Git em andamento. Inventarie as mudanças pendentes do checkout
+   principal, incluindo arquivos não rastreados. Não use reset, clean ou stash
+   automático; não incorpore trabalho de outros worktrees.
 2. Faça fetch de main em upstream e origin. Registre os SHAs de main, origin/main
    e upstream/main e fixe o SHA upstream alvo para esta execução. Confira a
    divergência, o ancestral comum e as mudanças próprias do fork. Não assuma que
    o nome de um remote garante que ele aponta para o repositório correto.
-3. Trabalhe numa branch de integração em um worktree limpo ao lado do checkout,
+3. Antes de integrar upstream, revise e valide as mudanças pendentes do checkout
+   principal e publique-as em origin/main. Essa preparação está autorizada pela
+   invocação da skill, inclusive para mudanças preexistentes no plugin. Organize
+   commits por assunto e adicione caminhos ou hunks explícitos; exclua segredos,
+   artefatos gerados e arquivos temporários. Não publique código incompleto ou
+   com verificações reprovadas apenas para limpar a árvore. Se houver edição
+   concorrente em andamento, preserve-a e coordene sua conclusão antes do commit.
+   Verifique que a main local e origin/main contêm esses commits e registre esse
+   SHA como base do fork para a comparação de compatibilidade. As mudanças do
+   plugin publicadas nesta preparação pertencem à base; não as altere depois
+   para acomodar o upstream. Ao retomar uma integração já iniciada, incorpore a
+   nova base publicada ao worktree existente e revalide o que mudou.
+4. Trabalhe numa branch de integração em um worktree limpo ao lado do checkout,
    conforme as instruções locais. Comece de uma base que contenha a main local e
    a main publicada; investigue divergências antes de incorporá-las. Preserve o
    checkout do usuário. Se já houver uma integração desta tarefa, inspecione e
    retome em vez de duplicar o trabalho.
-4. Prefira um merge do SHA upstream alvo completo, preservando a ancestralidade.
+5. Prefira um merge do SHA upstream alvo completo, preservando a ancestralidade.
    Use fetch + merge explícito em vez de um pull que dependa da configuração de
    rebase ou misture a branch errada. A quantidade de commits, sozinha, não
    justifica fragmentação. Não faça squash, rebase da main publicada ou uma série
    de cherry-picks para simular a sincronização.
-5. Integre por marcos apenas quando uma migração ou refatoração identificada
+6. Integre por marcos apenas quando uma migração ou refatoração identificada
    permitir resolver e validar dependências separadamente. Escolha SHAs ancestrais
    do alvo em ordem, preferencialmente no first-parent, e justifique os marcos.
    O resultado só está completo quando inclui todo o SHA upstream alvo.
@@ -106,11 +122,45 @@ Siga os comandos e limites de validação do AGENTS.md vigente, incluindo
 - Leia `evals/README.md` se a integração alterar texto voltado ao modelo e execute
   os casos aplicáveis. Não afrouxe verificações para conseguir um resultado verde.
 
-Se uma verificação necessária falhar ou estiver indisponível, registre a evidência
-e deixe a integração pendente; não declare sucesso nem publique como concluída.
-Encerre servidores e abas da tarefa assim que terminar a validação.
+### Duração e divisão da validação
 
-## Publicar e encerrar
+Inspecione a implementação vigente de `scripts/check-changed.ts`. Atualmente,
+`--timeout` (ou `CHECK_CHANGED_TIMEOUT`) limita cada etapa; o padrão é 900 segundos.
+Esse limite não é o timeout individual de um teste. O script agrupa os arquivos
+Vitest selecionados em uma única etapa, portanto uma integração grande com um
+worker pode exceder o limite mesmo sem testes reprovados.
+
+- Para uma integração grande, use um orçamento inicial de 3600 segundos por
+  etapa, mantendo execução serial e um worker. Passe explicitamente o SHA da base
+  anterior à integração para cobrir todo o intervalo:
+
+  ```bash
+  VITEST_MAX_WORKERS=1 python3 scripts/local-validation.py -- vp run check:changed <sha-base-do-fork> --concurrency 1 --timeout 3600
+  ```
+
+- Se ocorrer timeout, distinga duração total insuficiente de teste travado,
+  falha de infraestrutura ou pressão de recursos. Examine os logs e corrija a
+  causa; ajuste o orçamento total quando a execução estiver progredindo. Não
+  encerre a atualização apenas porque expirou o padrão de 900 segundos. Não
+  aumente limites de memória, timeouts individuais nem retries dos testes.
+- A validação pode ser dividida em etapas e lotes sequenciais, mantendo o merge
+  completo do upstream. O script atual não oferece seleção de etapas nem lotes;
+  não invente flags ou declare que testes manuais substituem `check:changed`.
+  Se for necessário acrescentar esse suporte ao executor, preserve a seleção de
+  testes e checks do intervalo original e valide a lógica de particionamento.
+  Cada arquivo selecionado deve constar em um lote; registre a lista completa,
+  resultados e código de saída de cada lote, fora do repositório.
+- Só reutilize resultados de etapas concluídas quando houver evidência de que
+  seus arquivos, dependências, configuração e runtime continuam iguais. Alterações
+  posteriores invalidam os resultados afetados. Um lote interrompido permanece
+  pendente; lotes aprovados não tornam a validação completa enquanto faltar outro.
+
+Corrija verificações reprovadas dentro do escopo e continue a validação. Se houver
+um impedimento que não possa ser resolvido, registre a evidência e deixe a
+integração pendente; não declare sucesso nem publique como concluída. Encerre
+servidores e abas da tarefa assim que terminar a validação.
+
+## Publicar e preparar o desktop
 
 Após validar, faça commits somente do trabalho desta integração. Reconfira
 origin/main e a main local: se avançaram, incorpore as mudanças e revalide o que
@@ -123,11 +173,42 @@ validada pronta e informe exatamente o que impede concluir a integração local.
 Não confunda publicação remota com atualização do checkout local.
 
 Faça fetch de origin/main e confirme por ancestralidade que contém o SHA upstream
-alvo e os commits de adaptação. Só então remova worktree e branch temporários da
-tarefa, preservando qualquer trabalho não publicado. Se houver ticket explícito,
-registre evidências e entrega pelo fluxo de tickets aplicável.
+alvo e os commits de adaptação. No checkout principal, na main publicada, execute:
+
+```bash
+python3 scripts/update-local-desktop.py
+```
+
+Leia o script antes de executá-lo e confira o runtime exigido pelo repositório.
+Ele compila o AppImage, instala a release, prepara o plugin e atualiza o launcher,
+preservando a release anterior e deixando a ativação pendente do reinício.
+A reconstrução do plugin nesse empacotamento não substitui a prova de
+compatibilidade com o artefato anterior nem autoriza alterações em suas fontes.
+Use `--port` se o servidor local estiver numa porta diferente da padrão do script.
+Não substitua esse passo por `dist:desktop:linux`, que apenas gera o artefato.
+
+O script já usa `scripts/local-validation.py`: não aninhe outro wrapper, não
+execute junto com servidores de validação ou checks pesados e não aumente os
+limites de memória. Se o slot estiver ocupado, aguarde sua liberação sem iniciar
+outro build. Preserve as verificações de main publicada e fontes limpas do script;
+não descarte mudanças locais para fazê-lo passar.
+
+Acompanhe a execução até terminar. Confirme a saída de sucesso, o AppImage
+instalado, o launcher apontando para essa release e o `delivery.json` com o commit
+publicado e ativação `pending restart`. Se falhar, resolva o problema dentro do
+escopo autorizado e retome; se houver impedimento externo, registre-o e não diga
+que a nova versão está pronta. Nunca encerre o aplicativo ou reinicie seu servidor
+para ativar a atualização automaticamente.
+
+Remova worktree e branch temporários da tarefa, preservando qualquer trabalho não
+publicado. Se houver ticket explícito, registre evidências e entrega pelo fluxo
+de tickets aplicável.
 
 Informe: alvo integrado, adaptações feitas, evidências de contrato e plugins
 preservados, verificações e limitações, estado da main local e de origin/main e
-limpeza dos recursos. Se o alvo já estava integrado e não havia trabalho pendente,
-informe isso sem criar commits vazios.
+limpeza dos recursos. Informe também o commit e caminho da release instalada e
+que falta apenas fechar completamente e reabrir o T3 Code with Plugins.
+Se o alvo já estiver integrado, confira se a instalação preparada corresponde à
+main publicada: execute o script se faltar preparar essa versão. Se código e
+instalação já estiverem prontos, informe isso sem criar commits vazios ou repetir
+o build desnecessariamente.
