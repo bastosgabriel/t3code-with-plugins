@@ -33,6 +33,7 @@ const layerTest = () =>
             Effect.succeedSome({
               projectId,
               title: "Fixture",
+              hasCustomTitle: false,
               workspaceRoot: process.cwd(),
               defaultModelSelection: null,
               defaultThreadEnvMode: null,
