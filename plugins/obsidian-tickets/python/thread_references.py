@@ -151,7 +151,6 @@ def checked_ticket(vault, repo, board, ticket_id):
         raise ValueError('Ticket changed while reading.')
     tickets.VAULT = vault
     tickets.check(meta, board)
-    tickets.check_body(body, done=meta['status'] == 'done')
     return path, meta, body, content
 
 

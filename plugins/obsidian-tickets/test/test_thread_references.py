@@ -75,6 +75,39 @@ def apply_request(ws, reference=REFERENCE):
                        'expectedSha256': hashlib.sha256(ws.ticket.read_bytes()).hexdigest()}]}
 
 
+def test_link_and_unlink_preserve_tickets_with_historical_section_layouts(ws):
+    setup_workspace(ws)
+    header = ws.ticket.read_text().split('---', 2)[1]
+    body = '\n# Ticket\n\n## Resultado esperado\nPreservar o texto aprovado.\n\n## Critérios de conclusão\n- [ ] Revisão pendente.\n\n## Progresso atual do ticket\n- [x] Histórico imutável.\n'
+    ws.ticket.write_text('---' + header + '---\n' + body)
+    original = ws.ticket.read_bytes()
+    request = apply_request(ws)
+    key = {'vaultId': request['vaultId'], 'boardId': 'alpha', 'ticketId': 'ALPHA-001'}
+    result, document = call(ws, {'operation': 'read', **key})
+    assert result.returncode == 0, document
+    assert document['markdown'] == body
+    assert document['references'] == []
+    assert ws.ticket.read_bytes() == original
+
+    result, response = call(ws, request)
+    assert result.returncode == 0 and response['status'] == 'committed', response
+    result, document = call(ws, {'operation': 'read', **key})
+    assert result.returncode == 0, document
+    assert document['references'] == [{'environmentId': 'env-1', 'threadId': 'thread-1'}]
+    assert document['markdown'].startswith(body.split('## Progresso atual do ticket')[0])
+    assert document['markdown'].endswith('## Progresso atual do ticket\n- [x] Histórico imutável.\n')
+
+    request['operationId'] = 'unlink'
+    request['steps'][0].update(action='remove', expectedSha256=document['sha256'])
+    result, response = call(ws, request)
+    assert result.returncode == 0 and response['status'] == 'committed', response
+    result, document = call(ws, {'operation': 'read', **key})
+    assert result.returncode == 0, document
+    assert document['references'] == []
+    bounds, _ = refs.parse_section(document['markdown'])
+    assert document['markdown'][:bounds[0]] + document['markdown'][bounds[1] + 1:] == body
+
+
 def test_repository_scope_conflicting_hash_and_duplicate_ids_do_not_write(ws):
     setup_workspace(ws)
     request = apply_request(ws)

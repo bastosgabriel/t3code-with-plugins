@@ -134,6 +134,15 @@ it("persists bindings, rejects stale revisions and replays operation receipts wi
   };
   expect(value(await f.query("binding.get")).action).toEqual(selection);
   expect(value(await f.query("binding.get")).actions).toEqual([selection]);
+  expect(await f.bind("missing", 0, "missing")).toEqual({
+    ok: false,
+    error: {
+      code: "ticket_unavailable",
+      message: "The ticket could not be inspected: missing. No reference was written.",
+    },
+  });
+  expect((await f.documents()).calls).toBe(0);
+  expect(value(await f.query("binding.get")).revision).toBe(0);
   const first = await f.bind("T-1", 0, "first");
   expect(value(first).revision).toBe(1);
   expect(await f.bind("T-1", 0, "first")).toEqual(first);
