@@ -12,8 +12,12 @@ automation system. For native mobile testing, use
 
 ## Start the app
 
-Reuse this task's healthy dev server. Otherwise run `vp run dev` from the
-repository root and retain its terminal session. Use the worktree's ignored
+Reuse this task's healthy dev server. Otherwise run `python3 scripts/local-validation.py -- vp run dev` from the
+repository root and retain its terminal session. Follow the local validation
+resource policy in `AGENTS.md`. Exit 75 means the shared slot is occupied; defer
+validation rather than starting another server. Reuse only a server owned by this
+task and already running under the wrapper; stop an owned unguarded server before
+restarting it through the wrapper. Use the worktree's ignored
 `.t3` state and read the actual ports and pairing URL from the dev-runner output.
 Never run against `~/.t3/userdata` or set `VITE_HTTP_URL` or `VITE_WS_URL`.
 
@@ -47,13 +51,20 @@ Navigate to the complete startup pairing URL once with
 If the token was consumed or expired, run `node apps/server/src/bin.ts pair`
 for a fresh one. Keep using the same tab.
 
-## Verify and retain
+## Verify and clean up
 
-Exercise the affected flow and capture the state that proves it works. Keep
-the server, state, and panel available while the user inspects or iterates.
-An assistant turn ending is not teardown. Stop only processes you started,
-using retained terminal sessions or captured PIDs.
+Exercise the affected flow and save screenshots and logs outside disposable
+fixtures. Close this task's Browser tab and stop the retained wrapper session
+immediately after validation, including failures or cancellations. Verify that
+its scope stopped before starting another heavy check or handing off the slot.
+The wrapper cleans its own scope; Browser tabs in the installed app are outside
+it and must be closed separately. Never close the user's main window.
 
-When sharing is requested, start with `vp run dev --share` and give the user
+Keep a running environment only when Gabriel explicitly requests inspection;
+record its owner and end condition, and keep the wrapper and lock alive for that
+period. Retaining evidence or fixtures does not require a running server. Record
+cleanup and any retained resources in the ticket or final response.
+
+When sharing is requested, start with `python3 scripts/local-validation.py -- vp run dev --share` and give the user
 a fresh complete pairing URL that you have not consumed. Keep other credentials
 out of screenshots, commits, and replies.

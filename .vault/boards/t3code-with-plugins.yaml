@@ -16,6 +16,20 @@ writing_guidance:
     as AppImage, plugin-only, or both; record the ordered test, main integration,
     build, installation, restart, and runtime verification steps. Documentation
     and investigation-only tickets do not require a runtime deployment.
+    Validate ordinary frontend changes in each execution thread's own Browser
+    panel against its worktree's isolated development server and data. Reserve
+    per-ticket Electron testing for behavior that depends on the desktop shell,
+    such as windows, IPC, native shortcuts, or operating-system integration.
+    For concurrent tickets targeting the same installed release, designate one
+    delivery owner, integrate the verified changes serially, and perform one
+    combined AppImage build and isolated Electron verification covering all
+    included changes. Reference that shared delivery evidence in each ticket.
+    Track task-owned temporary directories and spawned processes, and include
+    cleanup immediately after validation after retaining final evidence.
+    Follow the local validation resource policy in AGENTS.md and the test-t3-app
+    procedure, including the shared validation slot and economical checks. Do not remove an
+    environment still needed for inspection, another active task, or delivery;
+    record its owner and cleanup condition until it can be safely removed.
 acceptance:
   always: []
   conditional:
@@ -29,8 +43,8 @@ acceptance:
       evidence: Focused test results and a short runtime transcript for server-only fixes, following AGENTS.md.
     - id: frontend-verification
       when: The ticket changes user-visible frontend behavior.
-      criterion: Complete one integrated real-client pass and record which entry points, clients, providers, contracts, reverse states, and connection modes apply.
-      evidence: test-t3-app or test-t3-mobile results, applicable surface decisions, and before/after captures for visual fixes.
+      criterion: Complete one integrated real-client pass using test-t3-app in the execution thread's own Browser panel against its worktree's isolated server and data for ordinary frontend changes, or test-t3-mobile for native mobile changes. Test separately in Electron when the behavior depends on the desktop shell. Record which entry points, clients, providers, contracts, reverse states, and connection modes apply. Final AppImage verification remains part of installed delivery.
+      evidence: Browser or mobile verification results, applicable surface decisions, before/after captures for visual fixes, and Electron results when desktop-specific behavior requires them.
     - id: pre-push-checks
       when: The ticket includes an authorized push of changes to the T3 Code repository.
       criterion: Run vp run check:changed before pushing and resolve relevant failures without running prohibited repository-wide checks.
@@ -41,13 +55,23 @@ acceptance:
       evidence: Passing test and check results, full delivery commit hashes verified as ancestors of main, the main revision used for the build, and the selected deployment route with its reason. Follow AGENTS.md for scoped checks; do not invent repository-wide test requirements.
     - id: installed-appimage-delivery
       when: The ticket changes the T3 host, renderer, server, desktop shell, shared plugin API, or dependencies/build inputs bundled into the desktop app, including changes that also modify plugins.
-      criterion: After the delivery gate passes, build the Linux AppImage with vp run dist:desktop:linux, verify it in an isolated desktop instance, install it in the user's fork release location, update the persistent fork launcher, restart safely, and verify the installed runtime and changed behavior. Preserve user data and the previous release for rollback; do not interrupt active turns to force a restart.
+      criterion: After the delivery gate passes, build the Linux AppImage with vp run dist:desktop:linux, verify it in an isolated desktop instance, install it in the user's fork release location, update the persistent fork launcher, restart safely, and verify the installed runtime and changed behavior. For concurrent tickets in the same release, assign one delivery owner and perform one combined build and isolated Electron verification covering every included change after serial main integration; reuse the shared evidence in each ticket. Preserve user data and the previous release for rollback; do not interrupt active turns to force a restart.
       evidence: Build log, source main SHA, artifact path and SHA-256, isolated desktop verification, launcher target, and observed installed runtime after restart. If active work prevents restart, record installation as pending activation and keep the ticket in-progress until activation is verified.
     - id: installed-plugin-delivery
       when: The ticket changes a separately installed plugin, whether alone or alongside host changes.
       criterion: After the delivery gate passes, compile the affected plugin from the verified main revision and reinstall it through the environment's supported plugin installation operation. For plugin-only changes compatible with the installed host API, do not rebuild the AppImage; for host/API changes, also complete AppImage delivery. Restart the environment safely and verify the active plugin and changed behavior, preserving configuration and bindings.
       evidence: Plugin build result, source main SHA, manifest version and bundle SHA-256, installation result, and active package verification after restart. A staged update alone is not completion; keep the ticket in-progress while activation is pending.
+    - id: local-validation-resources
+      when: Execution runs local E2E, validation servers, builds, or check:changed on the Linux workstation.
+      criterion: Follow AGENTS.md local validation resource policy and test-t3-app when applicable; use the shared wrapper across worktrees and release the slot after cleanup, or record explicit inspection retention.
+      evidence: Wrapped command and result, stopped scope and closed task-owned Browser tabs, retained evidence paths, and owner/end condition for any explicitly retained environment.
+    - id: task-artifact-cleanup
+      when: Execution creates temporary files, test environments, processes, or worktrees.
+      criterion: Immediately after validation (including failure or cancellation), preserve final evidence in a durable ticket-linked location outside the worktree, stop task-owned test processes by captured PID or retained session, and remove disposable task-owned fixtures, database copies, browser/Electron profiles, temporary builds, scripts, and worktrees once no active task, inspection, or delivery needs them. Never rely on /tmp cleanup, kill by process-name patterns, or delete shared resources, user data, final delivery artifacts, rollback releases, or unrelated work. Retain running validation environments only for explicitly requested inspection, holding the shared slot and recording an owner and end condition; keep this criterion pending until disposal or an explicit retention decision is recorded.
+      evidence: Inventory of removed resources and stopped processes, retained evidence paths, and the reason and owner for any intentionally retained resources. Verify worktree integration and unrelated changes before removing a worktree.
 sources:
+  - "User instruction on 2026-10-30: serialize heavy local validation across worktrees, clean up after verification, and align AGENTS.md, testing skill, and ticket evidence to prevent memory pressure."
+  - "User instruction on 2026-10-30: default to per-worktree Browser verification, consolidate Electron verification and AppImage packaging for integrated delivery, and include task artifact cleanup in the ticket template."
   - "User instruction on 2026-10-30: ticket execution must be proactive through completion and automatic thread settlement; include this standing policy in the ticket template without requiring repeated requests."
   - "AGENTS.md: Hit every surface, Verifying, Documentation, and Plans and work artifacts."
   - "Board initialization request on 2026-10-29: minimal upstream coupling, plug-and-play plugins, architecture learning, and HTML diagrams."
