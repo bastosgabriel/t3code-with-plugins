@@ -342,10 +342,10 @@ export async function activate(api: PluginApi): Promise<void> {
             reference,
           });
         }
-      } catch {
+      } catch (error) {
         return failure(
           "ticket_unavailable",
-          "The ticket could not be inspected. No reference was written.",
+          `The ticket could not be inspected${error instanceof Error ? `: ${error.message}` : ""}. No reference was written.`,
         );
       }
       const receipt: Receipt = { fingerprint, status: "prepared", previous, target };

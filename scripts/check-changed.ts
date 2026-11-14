@@ -228,7 +228,10 @@ const checkChanged = Effect.fn("checkChanged")(function* (input: {
   // macOS counts its file cache as used, so available memory there would
   // starve a large Mac. Elsewhere availableMemory() honors a cgroup limit.
   const platform = yield* HostProcess.Platform;
-  const concurrency = Option.getOrElse(
+  const economical =
+    Option.getOrElse(yield* Config.option(Config.String("T3CODE_CHECK_ECONOMICAL")), () => "") ===
+    "1";
+  const configuredConcurrency = Option.getOrElse(
     yield* override("concurrency", input.concurrency, "CHECK_CHANGED_CONCURRENCY"),
     () =>
       defaultConcurrency(
@@ -236,6 +239,7 @@ const checkChanged = Effect.fn("checkChanged")(function* (input: {
         platform === "darwin" ? NodeOS.totalmem() : process.availableMemory(),
       ),
   );
+  const concurrency = economical ? 1 : configuredConcurrency;
   const timeoutSeconds = Option.getOrElse(
     yield* override("timeout", input.timeout, "CHECK_CHANGED_TIMEOUT"),
     () => 900,
@@ -513,6 +517,7 @@ const checkChanged = Effect.fn("checkChanged")(function* (input: {
             ...command(`test (${vitestTests.length} files)`, [
               "test",
               "run",
+              ...(economical ? ["--maxWorkers=1", "--no-file-parallelism"] : []),
               "--passWithNoTests",
               ...vitestTests,
             ]),
@@ -536,6 +541,7 @@ const checkChanged = Effect.fn("checkChanged")(function* (input: {
             ...command(`react compiler (${compilerFiles} files)`, [
               "test",
               "run",
+              ...(economical ? ["--maxWorkers=1", "--no-file-parallelism"] : []),
               ...compilerApps.map((app) => app.test),
               "-t",
               compilerApps.flatMap((app) => app.pattern).join("|"),

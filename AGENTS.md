@@ -143,9 +143,19 @@ An empty database is a bad test. Seed your worktree's `.t3` with a copy of real 
 
 For mobile verification, a missing or outdated native client is an install step, not a blocker. Run `vp run mobile:install <ios|android> [device-id]` on the device host before starting Metro; it targets the only booted simulator or connected Android device when the id is omitted. It installs the dev client for this checkout's native fingerprint from the shared cache in seconds and builds only when no machine has built it yet, so prefer it over `expo run:*`, `xcodebuild`, or `gradlew`, which rebuild from scratch. Its stdout is one JSON line; build output goes to the log it names. See `test-t3-mobile` for the full workflow.
 
+## Local validation resources (fork policy)
+
+- On this Linux workstation, serialize E2E, development servers used for validation, builds, and `check:changed` across all worktrees with `python3 scripts/local-validation.py -- <command>`. Exit 75 means another task owns the slot: defer the heavy work; do not bypass the lock or start another environment. Lightweight reads and edits can continue.
+- Reuse one isolated server and Browser tab for the active validation. Use a separate Electron instance only for desktop-specific behavior or the combined release verification. Do not run builds or heavy checks alongside a retained validation server, even within the same task.
+- Retain the wrapper's terminal session during interactive validation. Save evidence, close task-owned Browser tabs, and stop the session as soon as validation finishes, including failure or cancellation. Do not wait for ticket closure. Retain a running environment only for explicitly requested inspection, with an owner and an end condition; it continues to occupy the validation slot. Preserve fixtures needed for later work without leaving their servers running.
+- The wrapper stops its own systemd scope and enables economical `check:changed` execution. Processes launched outside that scope (including Browser tabs in the installed app) require explicit cleanup by their recorded owner. Never stop the user's installed app or another task's resources. Do not raise memory limits to bypass pressure.
+- Record verification commands/results, evidence paths, and cleanup or explicit retention in the ticket. For ad hoc work, report them in the final response. This policy also applies to existing tickets without the new template criteria.
+
 ## Evals
 
 `evals/` checks how real models behave with T3 Code's model-facing text: agent instructions, MCP tool descriptions and schemas, and generated titles. Before you change that text, read [evals/README.md](evals/README.md) and run the evals it names. When you fix a model behavior bug, add a case that fails before the fix.
+
+- Gabriel does not have an Anthropic API key. Never ask him to provide one again, either in chat or through a private secret card. Record evals requiring that key as skipped because credentials are unavailable, and continue the remaining validation without asking again for approval to skip them.
 
 ## Ticket publication (fork policy)
 
