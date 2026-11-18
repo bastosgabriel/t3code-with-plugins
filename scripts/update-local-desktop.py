@@ -88,8 +88,22 @@ def replace_launcher(launcher, reviewed, updated, backup):
         temporary.unlink(missing_ok=True)
 
 
+def server_cli(home, port, proc_root=Path('/proc')):
+    runtime = json.loads((home / 'userdata/server-runtime.json').read_text())
+    pid = runtime.get('pid')
+    if type(pid) is not int or pid <= 0 or runtime.get('port') != port:
+        raise RuntimeError('Running desktop does not match the requested local server.')
+    process = proc_root / str(pid)
+    executable = (process / 'exe').resolve(strict=True)
+    bundled = executable.parent / 'resources/app.asar/apps/server/dist/bin.mjs'
+    if str(bundled).encode() not in (process / 'cmdline').read_bytes().split(b'\0'):
+        raise RuntimeError('Cannot identify the running desktop CLI; keep the fork app open.')
+    # The new CLI may require migrations that cannot run while the old server owns the database.
+    return ['env', 'ELECTRON_RUN_AS_NODE=1', str(executable), str(bundled), 'auth', 'session']
+
+
 def stage_plugin(directory, home, port):
-    cli = [shutil.which('node'), str(ROOT / 'apps/server/src/bin.ts'), 'auth', 'session']
+    cli = server_cli(home, port)
     issued = json.loads(output(cli + ['issue', '--base-dir', str(home), '--scope',
                                     'environment:maintain', '--scope', 'orchestration:read',
                                     '--ttl', '5m', '--label', 'local-desktop-update', '--json']))

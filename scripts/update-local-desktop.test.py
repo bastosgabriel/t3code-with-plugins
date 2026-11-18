@@ -7,6 +7,7 @@ import tempfile
 import unittest
 from unittest.mock import patch
 import subprocess
+import json
 
 spec = importlib.util.spec_from_file_location('updater', Path(__file__).with_name('update-local-desktop.py'))
 updater = importlib.util.module_from_spec(spec)
@@ -14,6 +15,29 @@ spec.loader.exec_module(updater)
 
 
 class UpdateLocalDesktopTest(unittest.TestCase):
+    def test_auth_cli_matches_the_running_desktop_and_rejects_stale_runtime(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            home, proc = root / 'home', root / 'proc'
+            runtime = home / 'userdata/server-runtime.json'
+            runtime.parent.mkdir(parents=True)
+            runtime.write_text(json.dumps({'pid': 123, 'port': 3773}))
+            process = proc / '123'
+            process.mkdir(parents=True)
+            executable = root / 'mounted/t3code'
+            executable.parent.mkdir()
+            executable.touch()
+            (process / 'exe').symlink_to(executable)
+            bundled = executable.parent / 'resources/app.asar/apps/server/dist/bin.mjs'
+            (process / 'cmdline').write_bytes(f'{executable}\0--require\0cache.cjs\0{bundled}\0'.encode())
+            self.assertEqual(updater.server_cli(home, 3773, proc),
+                             ['env', 'ELECTRON_RUN_AS_NODE=1', str(executable), str(bundled), 'auth', 'session'])
+            with self.assertRaises(RuntimeError):
+                updater.server_cli(home, 4000, proc)
+            (process / 'cmdline').write_bytes(b'unrelated-process\0')
+            with self.assertRaises(RuntimeError):
+                updater.server_cli(home, 3773, proc)
+
     def test_launcher_preserves_environment_and_rejects_unrecognized_targets(self):
         original = "from pathlib import Path\nenv = {'T3CODE_HOME': 'keep'}\napp = Path.home() / '.local/share/t3code-with-plugins/releases/old/app.AppImage'\nlaunch(app, env)\n"
         result = updater.launcher_update(original, Path('/new/app.AppImage'))

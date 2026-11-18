@@ -126,9 +126,9 @@ Siga os comandos e limites de validação do AGENTS.md vigente, incluindo
 
 Inspecione a implementação vigente de `scripts/check-changed.ts`. Atualmente,
 `--timeout` (ou `CHECK_CHANGED_TIMEOUT`) limita cada etapa; o padrão é 900 segundos.
-Esse limite não é o timeout individual de um teste. O script agrupa os arquivos
-Vitest selecionados em uma única etapa, portanto uma integração grande com um
-worker pode exceder o limite mesmo sem testes reprovados.
+Esse limite não é o timeout individual de um teste. Sem `--test-batch-size`, o script
+agrupa os arquivos Vitest selecionados em uma única etapa, portanto uma integração
+grande com um worker pode exceder o limite mesmo sem testes reprovados.
 
 - Para uma integração grande, use um orçamento inicial de 3600 segundos por
   etapa, mantendo execução serial e um worker. Passe explicitamente o SHA da base
@@ -143,13 +143,11 @@ worker pode exceder o limite mesmo sem testes reprovados.
   causa; ajuste o orçamento total quando a execução estiver progredindo. Não
   encerre a atualização apenas porque expirou o padrão de 900 segundos. Não
   aumente limites de memória, timeouts individuais nem retries dos testes.
-- A validação pode ser dividida em etapas e lotes sequenciais, mantendo o merge
-  completo do upstream. O script atual não oferece seleção de etapas nem lotes;
-  não invente flags ou declare que testes manuais substituem `check:changed`.
-  Se for necessário acrescentar esse suporte ao executor, preserve a seleção de
-  testes e checks do intervalo original e valide a lógica de particionamento.
-  Cada arquivo selecionado deve constar em um lote; registre a lista completa,
-  resultados e código de saída de cada lote, fora do repositório.
+- Use `--test-batch-size 100` quando precisar limitar a duração de cada processo
+  Vitest e renovar o navegador entre lotes. Os lotes são sequenciais e mantêm todos
+  os arquivos selecionados; o log registra a lista completa e o resultado de cada
+  lote. Guarde esse log fora do repositório. O script não oferece seleção de etapas;
+  não declare que testes manuais substituem `check:changed`.
 - Só reutilize resultados de etapas concluídas quando houver evidência de que
   seus arquivos, dependências, configuração e runtime continuam iguais. Alterações
   posteriores invalidam os resultados afetados. Um lote interrompido permanece
